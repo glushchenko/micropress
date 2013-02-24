@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import re, math
+import re, math, sys
 from os import path, listdir, makedirs, system
 from jinja2.loaders import FileSystemLoader
 from jinja2 import Environment
@@ -12,7 +12,7 @@ from urllib import unquote
 from datetime import datetime
 from config import *
 
-PATH = path.dirname(path.abspath(__file__))
+PATH = path.realpath(path.join(path.dirname(path.abspath(__file__)), ".."))
 TEMPLATE_PATH = path.join(PATH, "templates/")
 SOURCES_PATH = path.join(PATH, "sources/")
 POSTS_PATH = path.join(SOURCES_PATH, "posts/")
@@ -22,6 +22,8 @@ PUBLIC_PATH = path.join(PATH, "public/")
 BLOG_PATH = path.join(PUBLIC_PATH, "blog")
 CATEGORIES = path.join(BLOG_PATH, "categories")
 ARCHIVES = path.join(BLOG_PATH, "archives")
+
+sys.path.append(PATH)
 
 class Entry:
     def __init__(self, *initial_data, **kwargs):
