@@ -10,7 +10,6 @@ from markdown2 import markdown
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urllib import unquote
 from datetime import datetime
-from config import *
 
 PATH = path.realpath(path.join(path.dirname(path.abspath(__file__)), ".."))
 TEMPLATE_PATH = path.join(PATH, "templates/")
@@ -24,6 +23,7 @@ CATEGORIES = path.join(BLOG_PATH, "categories")
 ARCHIVES = path.join(BLOG_PATH, "archives")
 
 sys.path.append(PATH)
+from config import *
 
 class Entry:
     def __init__(self, *initial_data, **kwargs):
