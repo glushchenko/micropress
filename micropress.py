@@ -103,7 +103,7 @@ class Press:
         while i <= pages:
             offset = i*POST_PER_PAGE - 10
             posts = posts_filtered[offset:offset+10]
-            rendered = self.render('index.html', posts=posts, page=i, pages=pages)
+            rendered = self.render('index.html', posts=posts, page=i, total_pages=pages)
             to = PUBLIC_PATH if i == 1 else path.join(BLOG_PATH, 'page', str(i))
             self.write(to, rendered)
             i += 1
