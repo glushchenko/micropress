@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import re, math, sys
-from os import path, listdir, makedirs, system
+import re, math, sys, time
+from os import path, listdir, makedirs, system, remove
 from jinja2.loaders import FileSystemLoader
 from jinja2 import Environment
 from werkzeug import script
@@ -10,6 +10,7 @@ from markdown2 import markdown
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urllib import unquote
 from datetime import datetime
+from shutil import copyfile
 
 PATH = path.realpath(path.join(path.dirname(path.abspath(__file__)), ".."))
 TEMPLATE_PATH = path.join(PATH, "templates/")
@@ -250,6 +251,17 @@ def action_gp():
 def action_gs():
     action_generate()
     action_sync()
+
+def action_new(name=('n', '')):
+    post_dst = POSTS_PATH + time.strftime("%Y-%m-%d") + '-' + name + '.markdown'
+    copyfile(TEMPLATE_PATH + 'base.markdown', post_dst)
+    system("vim " + post_dst)
+
+def action_rm(name=('r', '')):
+    remove(POSTS_PATH + time.strftime("%Y-%m-%d") + '-' + name + '.markdown')
+
+def action_posts(name=('p')):
+    system("cd " + POSTS_PATH + "; ls -la;")
 
 if __name__ == '__main__':
     script.run()
