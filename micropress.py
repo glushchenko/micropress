@@ -252,7 +252,7 @@ def action_gs():
     action_generate()
     action_sync()
 
-def action_new(name=('n', '')):
+def action_add(name=('n', '')):
     post_dst = POSTS_PATH + time.strftime("%Y-%m-%d") + '-' + name + '.markdown'
     copyfile(TEMPLATE_PATH + 'base.markdown', post_dst)
     system("vim " + post_dst)
@@ -260,8 +260,8 @@ def action_new(name=('n', '')):
 def action_rm(name=('r', '')):
     remove(POSTS_PATH + time.strftime("%Y-%m-%d") + '-' + name + '.markdown')
 
-def action_posts(name=('p')):
-    system("cd " + POSTS_PATH + "; ls -la;")
+def action_commit():
+    system("cd " + POSTS_PATH + "; git add . ; git commit -m 'up'; git push;")
 
 if __name__ == '__main__':
     script.run()
