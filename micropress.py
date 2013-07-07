@@ -54,7 +54,7 @@ class Date(Entry):
         return self.get_datetime().isoformat()
 
     def get_datetime(self):
-        return datetime(int(self.year), int(self.month), int(self.day))
+        return datetime(int(self.year), int(self.month), int(self.day), int(self.minute), int(self.second))
 
 class Post(Entry):
     def get_full(self):
@@ -191,8 +191,19 @@ class Octopress(Press):
         content = body_list.pop(0)
         description = "".join(body_list)
 
+        time=re.search('(?<=time:).+', settings)
+        if time:
+            time = time.group(0).strip().split(':')
+        
         return Post(
-            date=Date(year=name[:4], month=name[5:7], day=name[8:10]),
+            date=
+                Date(
+                    year=name[:4], 
+                    month=name[5:7], 
+                    day=name[8:10],
+                    minute=time[0] if time else 0,
+                    second=time[1] if time else 0
+                ),
             name=name[11:-9],
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
             content=markdown(content),
