@@ -9,7 +9,7 @@ from werkzeug import script
 from markdown2 import markdown
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urllib import unquote
-from datetime import datetime
+from datetime import datetime, tzinfo, timedelta
 from shutil import copyfile
 
 PATH = path.realpath(path.join(path.dirname(path.abspath(__file__)), ".."))
@@ -37,6 +37,10 @@ class Entry:
 class Category(Entry):
     pass
 
+class TZ(tzinfo):
+    def utcoffset(self, dt): 
+        return timedelta(minutes=TIMEZONE_OFFSET)
+    
 class Date(Entry):
     def get_full(self):
         day = int(self.day)
@@ -54,14 +58,21 @@ class Date(Entry):
         return self.get_datetime().isoformat()
 
     def get_datetime(self):
-        return datetime(int(self.year), int(self.month), int(self.day), int(self.minute), int(self.second))
+        return datetime(int(self.year), int(self.month), int(self.day), int(self.minute), int(self.second), tzinfo=TZ())
 
 class Post(Entry):
     def get_full(self):
         return self.content + self.description
+
     def get_url(self):
         return 'http://' + HOST + '/blog/' + self.date.year + '/' + self.date.month + '/' + self.date.day + '/' + \
             self.name + '/'
+
+    def has_excluded_cats(self, exclude = EXCLUDE_CATEGORY):
+        for category in self.categories:
+            if category.name in exclude:
+                return True;
+        return False;
 
 class Page(Entry):
     pass
@@ -77,6 +88,7 @@ class Press:
         self.gen_categories()
         self.gen_archives()
         self.gen_feed()
+        self.gen_subfeeds()
         self.gen_static()
 
     def load_first_press(self):
@@ -95,7 +107,7 @@ class Press:
     def gen_pages(self):
         posts_filtered = []
         for post in self.posts:
-            if [i for i in EXCLUDE_CATEGORY if i in post.categories]:
+            if post.has_excluded_cats():
                 continue
             posts_filtered.append(post)
         size = len(posts_filtered)
@@ -112,17 +124,30 @@ class Press:
     def gen_categories(self):
         categories = self.sort_by_categories(self.posts)
         for key, value in categories.iteritems():
-            category_path = path.join(CATEGORIES, key)
+            category_path = path.join(CATEGORIES, key.lower())
+            print category_path
             rendered = self.render('categories.html', years=self.sort_by_years(value), categories=key)
             self.write(category_path, rendered)
 
     def gen_archives(self):
-        rendered = self.render('categories.html', years=self.sort_by_years(self.posts))
+        rendered = self.render('categories.html', years=self.sort_by_years(self.posts, True))
         self.write(ARCHIVES, rendered)
 
     def gen_feed(self):
-        rendered = self.render('atom.xml', posts=self.posts)
+        posts_filtered = []
+        for post in self.posts:
+            if post.has_excluded_cats():
+                continue
+            posts_filtered.append(post)
+        rendered = self.render('atom.xml', posts=posts_filtered)
         self.write(PUBLIC_PATH, rendered, 'atom.xml')
+
+    def gen_subfeeds(self):
+        feeds = self.sort_by_feeds(self.posts)
+        for key, value in feeds.iteritems():
+            category_path = path.join(CATEGORIES, key.link.lower())
+            rendered = self.render('atom.xml', posts=value, category=key)
+            self.write(category_path, rendered, 'atom.xml')
 
     def gen_static(self):
         for page in self.pages:
@@ -137,7 +162,7 @@ class Press:
             'author': AUTHOR,
             'date': "%s&mdash;%s" % (self.first_press, datetime.now().year),
             'pages': self.pages,
-            'datetime': datetime
+            'datetime_now': datetime.now().replace(tzinfo = TZ(), microsecond=0)
         }
         return template.render(dict(kwargs.items() + config.items()))
 
@@ -153,22 +178,39 @@ class Press:
         template = Environment(loader=FileSystemLoader(path.join(PATH, TEMPLATE_PATH)))
         return template.get_template(name)
 
-    def sort_by_years(self, posts):
+    def sort_by_years(self, posts, archive=False):
         years = {}
+        include = {}
+        if archive:
+            for post in posts:
+                if not (post.has_excluded_cats()):
+                    include[post.date.year] = True
         for post in posts:
-            if not years.has_key(post.date.year):
-                years[post.date.year] = []
-            years[post.date.year].append(post)
+            if not archive or post.date.year in include:
+                if not years.has_key(post.date.year):
+                    years[post.date.year] = []
+                if archive and (post.has_excluded_cats()):
+                    pass
+                else:
+                    years[post.date.year].append(post)
         return reversed(sorted(years.iteritems()))
 
     def sort_by_categories(self, posts):
         categories = {}
         for post in posts:
             for category in post.categories:
-                if not categories.has_key(category):
-                    categories[category] = []
-                categories[category].append(post)
+                if not categories.has_key(category.link):
+                    categories[category.link] = []
+                categories[category.link].append(post)
         return categories
+    
+    def sort_by_feeds(self, posts):
+        feeds = {}
+        for post in posts:
+            if not feeds.has_key(post.categories[0]):
+                feeds[post.categories[0]] = []
+            feeds[post.categories[0]].append(post)
+        return feeds
 
 class Octopress(Press):
     def load(self):
@@ -194,7 +236,18 @@ class Octopress(Press):
         time=re.search('(?<=time:).+', settings)
         if time:
             time = time.group(0).strip().split(':')
-        
+
+        categories = re.search('(?<=categories:).+', settings).group(0).strip()
+        categoriesList = categories.split(',') if (',' in categories) else categories.split()
+
+        for key, item in enumerate(categoriesList):
+            categoryLink = categoryName = item.strip()
+            if ('/' in item):
+                splitted = item.split("/", 1)
+                categoryLink = splitted[1].strip()
+                categoryName = splitted[0].strip()
+            categoriesList[key] = Category(link=categoryLink, name=categoryName)
+
         return Post(
             date=
                 Date(
@@ -208,8 +261,7 @@ class Octopress(Press):
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
             content=markdown(content),
             description=markdown(description),
-            # TODO: multiple items parser
-            categories=[re.search('(?<=categories:).+', settings).group(0).strip()]
+            categories=categoriesList
         )
 
     def parse_page(self, name):
