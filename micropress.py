@@ -215,7 +215,7 @@ class Press:
 class Octopress(Press):
     def load(self):
         self.posts = [self.parse_post(f) for f in reversed(listdir(POSTS_PATH))
-            if path.isfile(path.join(POSTS_PATH, f))
+            if path.isfile(path.join(POSTS_PATH, f)) and not f.startswith('.')
         ]
         self.pages = [self.parse_page(f) for f in reversed(listdir(PAGES_PATH))
             if path.isfile(path.join(PAGES_PATH, f))
