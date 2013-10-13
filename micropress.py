@@ -139,7 +139,7 @@ class Press:
             if post.has_excluded_cats():
                 continue
             posts_filtered.append(post)
-        rendered = self.render('atom.xml', posts=posts_filtered)
+        rendered = self.render('atom.xml', posts=posts_filtered[0:30])
         self.write(PUBLIC_PATH, rendered, 'atom.xml')
 
     def gen_subfeeds(self):
