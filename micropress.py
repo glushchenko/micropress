@@ -6,7 +6,7 @@ from os import path, listdir, makedirs, system, remove
 from jinja2.loaders import FileSystemLoader
 from jinja2 import Environment
 from werkzeug import script
-from markdown2 import markdown
+from markdown import markdown
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urllib import unquote
 from datetime import datetime, tzinfo, timedelta
@@ -248,6 +248,10 @@ class Octopress(Press):
                 categoryName = splitted[0].strip()
             categoriesList[key] = Category(link=categoryLink, name=categoryName)
 
+        link = re.search('(?<=link:).+', settings)
+        if link:
+            link = link.group(0).strip()
+
         return Post(
             date=
                 Date(
@@ -259,9 +263,10 @@ class Octopress(Press):
                 ),
             name=name[11:-9],
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
-            content=markdown(content),
-            description=markdown(description),
-            categories=categoriesList
+            content=markdown(content, ['extra']),
+            description=markdown(description, ['extra']),
+            categories=categoriesList,
+            link=link
         )
 
     def parse_page(self, name):
@@ -275,7 +280,7 @@ class Octopress(Press):
         return Page(
             name=name[:-9],
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
-            content=markdown(body)
+            content=markdown(body, ['extra'])
         )
 
 class Server(BaseHTTPRequestHandler):
