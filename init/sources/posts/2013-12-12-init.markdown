@@ -1,0 +1,11 @@
+---
+title: "Hello world"
+categories: Разработка/Devel
+time: 20:05
+---
+
+Hello world!
+
+<!-- more -->
+
+Some cut.

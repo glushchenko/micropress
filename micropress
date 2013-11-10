@@ -333,7 +333,7 @@ class Server(BaseHTTPRequestHandler):
             self.send_error(404, 'File not found')
 
 def action_sync():
-    system("rsync -avrz %s %s" % (config.build, config.to))
+    system("rsync -avrz %s %s" % (config.build + "/*", config.to))
     print('Sync done ...')
 
 def action_preview():

@@ -4,7 +4,7 @@ import os
 
 setup(
     name='Micropress',
-    version='0.1.1',
+    version='0.1.3',
     author='Oleksandr Glushchenko',
     author_email='contact@fluder.co',
     url='https://github.com/glushchenko/micropress',
