@@ -1,0 +1,20 @@
+[system]
+author = Micropress
+host = host.name
+name = Micropress Blog
+timezone_offset = 0
+post_per_page = 10
+
+[storage]
+build = ~/Documents/Micropress/build
+public = ~/Documents/Micropress/public
+templates = ~/Documents/Micropress/templates
+pages = ~/Documents/Micropress/sources/pages
+posts = ~/Documents/Micropress/sources/posts
+
+[sync]
+to = remote.host.name:/path/to/www
+
+[locale]
+month = Января, Февраля, Марта, Апреля, Мая, Июня, Июля, Августа, Сентября, Октября, Ноября, Декабря
+days = Пн, Вт, Ср, Чт, Пт, Сб, Вс

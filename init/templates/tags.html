@@ -1,0 +1,3 @@
+{% for category in post.categories %}
+    <a class="category" href="/blog/categories/{{ category.link|lower }}/">{{ category.name }}</a>{% if not loop.last and loop.first %} > {% endif %}{% if not loop.last and not loop.first %},{% endif %}
+{% endfor %}

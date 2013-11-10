@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+    {% for year, posts in years %}
+    <section class="archives">
+        <h1 class="year">{{ year}}</h1>
+        {% for post in posts %}
+            {% if archive and post.categories[0] == 'How-to' %}
+            {% else %}
+            <article>
+                <h2 class="title">
+                    {% if post.link %}
+                        <a href="{{ post.link }}">→ {{ post.title }}</a> • <a href="/blog/{{ post.date.year }}/{{ post.date.month }}/{{ post.date.day }}/{{ post.name}}/#cut">∞</a>
+                    {% else %}
+                        <a href="/blog/{{ post.date.year }}/{{ post.date.month }}/{{ post.date.day }}/{{ post.name}}/">{{ post.title }}</a>
+                    {% endif %}                                          
+                </h2>
+                <div class="meta">
+                    <div class="date"><time>{{ post.date.get_half() }}</time></div>
+                    <div class="tags">
+                        {% include "tags.html" %}
+                    </div>
+                </div>
+            </article>
+            {% endif %}
+        {% endfor %}
+    </section>
+    {% endfor %}
+{% endblock %}
+{% block meta %}
+<meta name="robots" content="noindex, follow">
+{% endblock %}
+
+

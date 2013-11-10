@@ -1,30 +1,58 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import re, math, sys, time
+import re, math, time, ConfigParser
 from os import path, listdir, makedirs, system, remove
-from jinja2.loaders import FileSystemLoader
-from jinja2 import Environment
-from werkzeug import script
-from markdown import markdown
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urllib import unquote
 from datetime import datetime, tzinfo, timedelta
 from shutil import copyfile
+from distutils.sysconfig import get_python_lib
+from jinja2.loaders import FileSystemLoader
+from jinja2 import Environment
+from werkzeug import script
+from markdown import markdown
 
-PATH = path.realpath(path.join(path.dirname(path.abspath(__file__)), ".."))
-TEMPLATE_PATH = path.join(PATH, "templates/")
-SOURCES_PATH = path.join(PATH, "sources/")
-POSTS_PATH = path.join(SOURCES_PATH, "posts/")
-PAGES_PATH = path.join(SOURCES_PATH, "pages")
-PUBLIC_PATH = path.join(PATH, "public/")
+class Config:
+    def __init__(self):
+        self.is_parsed = False
+        self._parser = ConfigParser.RawConfigParser(allow_no_value=True)
+        rc_path = path.expanduser('~/.microrc')
+        if path.exists(rc_path):
+            self._parser.read(rc_path)
+            self.is_parsed = True
+        
+    def __getattr__(self, option):
+        if self.is_parsed:
+            list = {
+                'month': 'locale',
+                'days': 'locale',
+                'public': 'storage',
+                'templates': 'storage',
+                'pages': 'storage',
+                'posts': 'storage',
+                'to': 'sync'
+            }
+            if option in ['templates', 'pages', 'posts', 'public', 'build']:
+                return path.expanduser(self._parser.get('storage', option))
+            elif option == 'exclude_category':
+                try:
+                    return self._parser.get('system', option).split(',')
+                except ConfigParser.NoOptionError:
+                    return []
+            elif option == 'post_per_page':
+                return int(self._parser.get('system', option))
+            elif list.has_key(option):
+                return self._parser.get(list[option], option).decode('utf-8')
+            else:
+                return self._parser.get('system', option)
 
-BLOG_PATH = path.join(PUBLIC_PATH, "blog")
-CATEGORIES = path.join(BLOG_PATH, "categories")
-ARCHIVES = path.join(BLOG_PATH, "archives")
+config = Config()
 
-sys.path.append(PATH)
-from config import *
+if config.is_parsed:
+    BLOG_PATH = path.join(config.build, "blog")
+    CATEGORIES = path.join(BLOG_PATH, "categories")
+    ARCHIVES = path.join(BLOG_PATH, "archives")
 
 class Entry:
     def __init__(self, *initial_data, **kwargs):
@@ -39,38 +67,45 @@ class Category(Entry):
 
 class TZ(tzinfo):
     def utcoffset(self, dt): 
-        return timedelta(minutes=TIMEZONE_OFFSET)
+        return timedelta(minutes=int(config.timezone_offset))
     
 class Date(Entry):
     def get_full(self):
+        locale_month = config.month.split(',')
+        weekdays = config.days.split(',')
         day = int(self.day)
         month = int(self.month) - 1
-        weekday = WEEKDAYS[self.get_datetime().weekday()]
-        return weekday + ', ' + str(day) + ' ' + LIST[month] + ' ' + str(self.year)
+        weekday = weekdays[self.get_datetime().weekday()]
+        return weekday + ', ' + str(day) + ' ' + locale_month[month] + ' ' + str(self.year)
 
     def get_half(self):
+        locale_month = config.month.split(',')
+        weekdays = config.days.split(',')
         day = int(self.day)
         month = int(self.month) - 1
-        weekday = WEEKDAYS[self.get_datetime().weekday()]
-        return weekday + ', ' + str(day) + ' ' + LIST[month]
+        weekday = weekdays[self.get_datetime().weekday()]
+        return weekday + ', ' + str(day) + ' ' + locale_month[month]
 
     def get_iso(self):
         return self.get_datetime().isoformat()
 
     def get_datetime(self):
-        return datetime(int(self.year), int(self.month), int(self.day), int(self.minute), int(self.second), tzinfo=TZ())
+        return datetime(
+            int(self.year), int(self.month), int(self.day), int(self.minute), int(self.second), 
+            tzinfo=TZ()
+        )
 
 class Post(Entry):
     def get_full(self):
         return self.content + self.description
 
     def get_url(self):
-        return 'http://' + HOST + '/blog/' + self.date.year + '/' + self.date.month + '/' + self.date.day + '/' + \
+        return 'http://' + config.host + '/blog/' + self.date.year + '/' + self.date.month + '/' + self.date.day + '/' + \
             self.name + '/'
 
-    def has_excluded_cats(self, exclude = EXCLUDE_CATEGORY):
+    def has_excluded_cats(self):
         for category in self.categories:
-            if category.name in exclude:
+            if category.name in config.exclude_category:
                 return True;
         return False;
 
@@ -111,13 +146,13 @@ class Press:
                 continue
             posts_filtered.append(post)
         size = len(posts_filtered)
-        pages = math.ceil(float(size)/POST_PER_PAGE) if size > POST_PER_PAGE else 1
+        pages = math.ceil(float(size)/config.post_per_page) if size > config.post_per_page else 1
         i = 1
         while i <= pages:
-            offset = i*POST_PER_PAGE - 10
-            posts = posts_filtered[offset:offset+10]
+            offset = i*config.post_per_page - config.post_per_page
+            posts = posts_filtered[offset:offset+config.post_per_page]
             rendered = self.render('index.html', posts=posts, page=i, total_pages=pages)
-            to = PUBLIC_PATH if i == 1 else path.join(BLOG_PATH, 'page', str(i))
+            to = config.build if i == 1 else path.join(BLOG_PATH, 'page', str(i))
             self.write(to, rendered)
             i += 1
 
@@ -125,7 +160,6 @@ class Press:
         categories = self.sort_by_categories(self.posts)
         for key, value in categories.iteritems():
             category_path = path.join(CATEGORIES, key.lower())
-            print category_path
             rendered = self.render('categories.html', years=self.sort_by_years(value), categories=key)
             self.write(category_path, rendered)
 
@@ -139,8 +173,8 @@ class Press:
             if post.has_excluded_cats():
                 continue
             posts_filtered.append(post)
-        rendered = self.render('atom.xml', posts=posts_filtered[0:30])
-        self.write(PUBLIC_PATH, rendered, 'atom.xml')
+        rendered = self.render('atom.xml', posts=posts_filtered[0:30], )
+        self.write(config.build, rendered, 'atom.xml')
 
     def gen_subfeeds(self):
         feeds = self.sort_by_feeds(self.posts)
@@ -152,19 +186,19 @@ class Press:
     def gen_static(self):
         for page in self.pages:
             rendered = self.render('page.html', page=page)
-            self.write(path.join(PUBLIC_PATH, page.name), rendered)
+            self.write(path.join(config.build, page.name), rendered)
 
     def render(self, template, **kwargs):
         template = self.get_base_template(template)
-        config = {
-            'host': HOST,
-            'name': NAME,
-            'author': AUTHOR,
+        options = {
+            'host': config.host,
+            'name': config.name,
+            'author': config.author,
             'date': "%s&mdash;%s" % (self.first_press, datetime.now().year),
             'pages': self.pages,
-            'datetime_now': datetime.now().replace(tzinfo = TZ(), microsecond=0)
+            'datetime_now': datetime.now().replace(tzinfo = TZ(), microsecond = 0)
         }
-        return template.render(dict(kwargs.items() + config.items()))
+        return template.render(dict(kwargs.items() + options.items()))
 
     def write(self, to, rendered, additional = 'index.html'):
         if not to.endswith('/'):
@@ -175,7 +209,7 @@ class Press:
             file.write(rendered.encode('utf-8'))
 
     def get_base_template(self, name):
-        template = Environment(loader=FileSystemLoader(path.join(PATH, TEMPLATE_PATH)))
+        template = Environment(loader=FileSystemLoader(config.templates))
         return template.get_template(name)
 
     def sort_by_years(self, posts, archive=False):
@@ -214,15 +248,15 @@ class Press:
 
 class Octopress(Press):
     def load(self):
-        self.posts = [self.parse_post(f) for f in reversed(listdir(POSTS_PATH))
-            if path.isfile(path.join(POSTS_PATH, f)) and not f.startswith('.')
+        self.posts = [self.parse_post(f) for f in reversed(listdir(config.posts))
+            if path.isfile(path.join(config.posts, f)) and not f.startswith('.')
         ]
-        self.pages = [self.parse_page(f) for f in reversed(listdir(PAGES_PATH))
-            if path.isfile(path.join(PAGES_PATH, f))
+        self.pages = [self.parse_page(f) for f in reversed(listdir(config.pages))
+            if path.isfile(path.join(config.pages, f)) and not f.startswith('.')
         ]
 
     def parse_post(self, name):
-        f = file(path.join(POSTS_PATH, name), "r")
+        f = file(path.join(config.posts, name), "r")
         post = f.read().decode('utf-8')
 
         list = post.split('---')
@@ -252,15 +286,18 @@ class Octopress(Press):
         if link:
             link = link.group(0).strip()
 
+        date = Date(
+            config=config,
+            year=name[:4], 
+            month=name[5:7], 
+            day=name[8:10],
+            minute=time[0] if time else 0,
+            second=time[1] if time else 0
+        )
+
         return Post(
-            date=
-                Date(
-                    year=name[:4], 
-                    month=name[5:7], 
-                    day=name[8:10],
-                    minute=time[0] if time else 0,
-                    second=time[1] if time else 0
-                ),
+            config=config,
+            date= date,
             name=name[11:-9],
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
             content=markdown(content, ['extra']),
@@ -270,13 +307,11 @@ class Octopress(Press):
         )
 
     def parse_page(self, name):
-        f = file(path.join(PAGES_PATH, name), "r")
+        f = file(path.join(config.pages, name), "r")
         page = f.read().decode('utf-8')
-
         list = page.split('---')
         settings = list.pop(1)
         body = "".join(list)
-
         return Page(
             name=name[:-9],
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
@@ -286,10 +321,9 @@ class Octopress(Press):
 class Server(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
-            action_generate()
             if self.path[-1:] == '/':
                 self.path = self.path + 'index.html'
-            f = open(PUBLIC_PATH + unquote(self.path))
+            f = open(config.build + unquote(self.path))
             self.send_response(200)
             self.end_headers()
             self.wfile.write(f.read())
@@ -299,17 +333,18 @@ class Server(BaseHTTPRequestHandler):
             self.send_error(404, 'File not found')
 
 def action_sync():
-    system("rsync -avrz %s %s" % (PUBLIC_PATH, SYNC_TO))
+    system("rsync -avrz %s %s" % (config.build, config.to))
     print('Sync done ...')
 
 def action_preview():
     server_address = ('127.0.0.1', 8080)
     httpd = HTTPServer(server_address, Server)
-    print('Http server is running ...')
+    print('Http server is running on http://127.0.0.1:8080')
     httpd.serve_forever()
 
 def action_generate():
-    engine = globals()[STRATEGY.title()]()
+    engine = Octopress()
+    system("cp -r " + config.public + "/* " + config.build )
     engine.generate()
 
 def action_gp():
@@ -321,15 +356,26 @@ def action_gs():
     action_sync()
 
 def action_add(name=('n', '')):
-    post_dst = POSTS_PATH + time.strftime("%Y-%m-%d") + '-' + name + '.markdown'
-    copyfile(TEMPLATE_PATH + 'base.markdown', post_dst)
+    post_dst = config.posts + time.strftime("%Y-%m-%d") + '-' + name + '.markdown'
+    copyfile(config.templates + 'base.markdown', post_dst)
     system("vim " + post_dst)
 
 def action_rm(name=('r', '')):
-    remove(POSTS_PATH + time.strftime("%Y-%m-%d") + '-' + name + '.markdown')
+    remove(config.posts + time.strftime("%Y-%m-%d") + '-' + name + '.markdown')
 
 def action_commit():
-    system("cd " + POSTS_PATH + "; git add . ; git commit -m 'up'; git push;")
+    system("cd " + config.posts + "; git add . ; git commit -m 'up'; git push;")
+
+def action_init():
+    init_path = path.expanduser('~') + '/Documents/Micropress/'
+    if not path.exists(init_path):
+        makedirs(init_path, 0755)
+    from_path = get_python_lib() + '/micropress/init/'
+    system("cp -r " + from_path + " " + init_path )
+    system("rm " + init_path + "/rctemplate")
+    if not path.exists(path.expanduser('~/.microrc')):
+        copyfile(from_path + 'rctemplate', path.expanduser('~/.microrc'))
+        print('Config successfully saved in ~/.microrc')
 
 if __name__ == '__main__':
     script.run()

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+    <title><![CDATA[{% if category %}{{category.name}} | {% endif %}{{ name }}]]></title>
+    <link href="http://{{ host }}/{% if category %}blog/categories/{{category.link|lower}}/{% endif %}atom.xml" rel="self"/>
+    <link href="http://{{ host }}/"/>
+    <updated>{{ datetime_now.isoformat() }}</updated>
+    <id>http://{{ host }}/</id>
+    <author>
+        <name><![CDATA[{{ author }}]]></name>
+    </author>
+    <generator uri="http://{{ host }}/">Micropress</generator>
+
+    {% for post in posts %}
+    <entry>
+        <title type="html"><![CDATA[{{ post.title }}]]></title>       
+        {% if post.link %}
+            <link href="{{ post.link }}"/>
+        {% else %}
+            <link href="{{ post.get_url() }}"/>
+        {% endif %}  
+        <updated>{{ post.date.get_iso() }}</updated>
+        <id>{{ post.get_url() }}</id>
+        <content type="html"><![CDATA[
+        {{ post.get_full() }}
+        ]]></content>
+    </entry>
+    {% endfor %}
+
+</feed>

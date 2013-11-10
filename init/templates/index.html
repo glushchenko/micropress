@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+    {% for post in posts %}
+        <article class="post">
+            <h2 class="title">
+            {% if post.link %}
+                <a href="{{ post.link }}">→ {{ post.title }}</a> • <a href="/blog/{{ post.date.year }}/{{ post.date.month }}/{{ post.date.day }}/{{ post.name}}/#cut">∞</a>
+            {% else %}
+                <a href="/blog/{{ post.date.year }}/{{ post.date.month }}/{{ post.date.day }}/{{ post.name}}/#cut">{{ post.title }}</a>
+            {% endif %}                
+            </h2>
+            
+            <div class="entry-content">
+                {{ post.content }}
+                <div class="entry-content__bottom">    
+                    <a href="/blog/{{ post.date.year }}/{{ post.date.month }}/{{ post.date.day }}/{{ post.name}}/#cut">∞</a><br>
+                    <time datetime="{{ post.date.get_iso() }}" data-updated="true">{{ post.date.get_full() }}</time>
+                    <div class="tags">
+                        {% include "tags.html" %}
+                    </div>
+                </div> 
+            </div>
+        </article>
+    {% endfor %}
+    {% if total_pages > 1 %}
+        <nav id="pagenavi">
+        {% if page > 1 %}
+            {% if page == 2 %}
+            <a href="/" class="prev">Назад</a>
+            {% else %}
+            <a href="/blog/page/{{ page - 1}}/" class="prev">Назад</a>
+            {% endif %}
+        {% endif %}
+        {% if page < total_pages %}
+            <a href="/blog/page/{{ page + 1 }}/" class="next">Далее</a>
+        {% endif %}
+            <div class="center"><a href="/blog/archives/">Архив</a></div>
+        </nav>
+    {% endif %}
+{% endblock %}
+{% block meta %}
+<meta name="robots" content="noindex, follow">
+{% endblock %}
