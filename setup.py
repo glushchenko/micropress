@@ -12,7 +12,7 @@ setup(
     data_files= [(get_python_lib() + '/micropress/%s' % (x[0]), map(lambda y: x[0]+'/'+y, x[2])) for x in os.walk('init/')],
     license='LICENSE.txt',
     description='Blog generator for hackers.',
-    long_description=open('README.txt').read(),
+    long_description=open('README.md').read(),
     install_requires=[
         'Jinja2',
         'markdown',
