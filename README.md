@@ -4,34 +4,34 @@ Micropress – Python blog generator for hackers.
 
 ## Install
 
-pip install micropress  
-micropress init — install config in home (~/.microrc) and default templates in ~/Documents/Micropress/ directory.   
+``pip install micropress``  
+``micropress init`` — install config in home (~/.microrc) and default templates in ~/Documents/Micropress/ directory.   
 
 ## Config
 
-vim ~/.microrc
+``vim ~/.microrc``
 
 ## Usage 
 
-micropress generate — save public and generated content into build directory.   
-micropress preview — blog preview on http://127.0.0.1:8080  
-micropress sync — upload content in production server.  
+``micropress generate`` — save public and generated content into build directory.   
+``micropress preview`` — blog preview on http://127.0.0.1:8080  
+``micropress sync`` — upload content in production server.  
 
-micropress gp - generate content and preview on http://127.0.0.1:8080    
-micropress gs - generate and sync  
+``micropress gp`` - generate content and preview on http://127.0.0.1:8080    
+``micropress gs`` - generate and sync  
 
 ## Uninstall
 
-pip uninstall micropress  
-rm ~/.microrc  
-rm -r ~/Documents/Micropress  
+``pip uninstall micropress``  
+``rm ~/.microrc``  
+``rm -r ~/Documents/Micropress``  
 
 --
 
 ## Установка
 
-pip install micropress
-micropress init — копирует начальный конфиг в домашнюю директорию (~/.microrc) и шаблоны по умолчанию в ~/Documents/Micropress/.
+``pip install micropress``
+``micropress init`` — копирует начальный конфиг в домашнюю директорию (~/.microrc) и шаблоны по умолчанию в ~/Documents/Micropress/.
 
 ## Конфиг
 
@@ -87,16 +87,16 @@ vim ~/.microrc
 
 ## Использование 
 
-micropress generate — сгенерировать страницы по набранным новостям и шаблонам (копируется в ~/Documents/Micropress/build/ по умолчанию)     
-micropress preview — показать локально превью http://127.0.0.1:8080  
-micropress sync — выложить контент на свой сервер (путь указывается в конфиге [sync] to).  
+``micropress generate`` — сгенерировать страницы по набранным новостям и шаблонам (копируется в ~/Documents/Micropress/build/ по умолчанию)     
+``micropress preview`` — показать локально превью http://127.0.0.1:8080  
+``micropress sync`` — выложить контент на свой сервер (путь указывается в конфиге [sync] to).  
 
-micropress gp - сгенерировать ипоказать превью on http://127.0.0.1:8080    
-micropress gs - сгенерировать и выложить  
+``micropress gp`` - сгенерировать ипоказать превью on http://127.0.0.1:8080    
+``micropress gs`` - сгенерировать и выложить  
 
 ## Удаление
 
-pip uninstall micropress  
-rm ~/.microrc  
-rm -r ~/Documents/Micropress  
+``pip uninstall micropress``  
+``rm ~/.microrc``  
+``rm -r ~/Documents/Micropress``  
 
