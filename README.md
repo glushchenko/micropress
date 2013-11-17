@@ -1,9 +1,6 @@
-micropress
-==========
+# Micropress
 
-Python blog generator for hackers  
-
-# EN
+Micropress – Python blog generator for hackers.  
 
 ## Install
 
@@ -29,7 +26,7 @@ pip uninstall micropress
 rm ~/.microrc  
 rm -r ~/Documents/Micropress  
 
-# RU
+--
 
 ## Установка
 
