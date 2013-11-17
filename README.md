@@ -3,6 +3,8 @@ micropress
 
 Python blog generator for hackers  
 
+# EN
+
 ## Install
 
 pip install micropress  
@@ -26,6 +28,8 @@ micropress gs - generate and sync
 pip uninstall micropress  
 rm ~/.microrc  
 rm -r ~/Documents/Micropress  
+
+# RU
 
 ## Установка
 
