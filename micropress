@@ -355,17 +355,6 @@ def action_gs():
     action_generate()
     action_sync()
 
-def action_add(name=('n', '')):
-    post_dst = config.posts + time.strftime("%Y-%m-%d") + '-' + name + '.markdown'
-    copyfile(config.templates + 'base.markdown', post_dst)
-    system("vim " + post_dst)
-
-def action_rm(name=('r', '')):
-    remove(config.posts + time.strftime("%Y-%m-%d") + '-' + name + '.markdown')
-
-def action_commit():
-    system("cd " + config.posts + "; git add . ; git commit -m 'up'; git push;")
-
 def action_init():
     init_path = path.expanduser('~') + '/Documents/Micropress/'
     if not path.exists(init_path):
