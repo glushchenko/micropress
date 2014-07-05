@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import re, math, time, ConfigParser
+import re, math, ConfigParser, time
 from os import path, listdir, makedirs, system, remove
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urllib import unquote
@@ -12,6 +12,10 @@ from jinja2.loaders import FileSystemLoader
 from jinja2 import Environment
 from werkzeug import script
 from markdown import markdown
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+from BeautifulSoup import BeautifulSoup
+
 
 class Config:
     def __init__(self):
@@ -21,7 +25,7 @@ class Config:
         if path.exists(rc_path):
             self._parser.read(rc_path)
             self.is_parsed = True
-        
+
     def __getattr__(self, option):
         if self.is_parsed:
             list = {
@@ -54,6 +58,7 @@ if config.is_parsed:
     CATEGORIES = path.join(BLOG_PATH, "categories")
     ARCHIVES = path.join(BLOG_PATH, "archives")
 
+
 class Entry:
     def __init__(self, *initial_data, **kwargs):
         for dictionary in initial_data:
@@ -62,13 +67,16 @@ class Entry:
         for key in kwargs:
             setattr(self, key, kwargs[key])
 
+
 class Category(Entry):
     pass
 
+
 class TZ(tzinfo):
-    def utcoffset(self, dt): 
+    def utcoffset(self, dt):
         return timedelta(minutes=int(config.timezone_offset))
-    
+
+
 class Date(Entry):
     def get_full(self):
         locale_month = config.month.split(',')
@@ -95,6 +103,7 @@ class Date(Entry):
             tzinfo=TZ()
         )
 
+
 class Post(Entry):
     def get_full(self):
         return self.content + self.description
@@ -109,17 +118,25 @@ class Post(Entry):
                 return True;
         return False;
 
+
 class Page(Entry):
     pass
 
+
 class Press:
+    main_class = 'mp-main'
+    prefix = 'index.html'
+
+    posts_filtered = []
+    posts_names = []
+
     def generate(self):
         self.load()
         self.load_first_press()
         print "Parsing done ..."
         self.gen_articles()
         print "Generation done ..."
-        self.gen_pages()
+        self.gen_pages(1)
         self.gen_categories()
         self.gen_archives()
         self.gen_feed()
@@ -127,34 +144,56 @@ class Press:
         self.gen_static()
 
     def load_first_press(self):
-        year = datetime.now().year;
+        year = datetime.now().year
         for post in self.posts:
             if int(post.date.year) < year:
                 year = post.date.year
         self.first_press = year
 
+    def gen_post(self, post):
+        post_path = path.join(BLOG_PATH, post.date.year, post.date.month, post.date.day, post.name)
+        rendered = self.render('article.html', post=post)
+        self.write(post_path, rendered)
+
     def gen_articles(self):
         for post in self.posts:
-            post_path = path.join(BLOG_PATH, post.date.year, post.date.month, post.date.day, post.name)
-            rendered = self.render('article.html', post=post)
-            self.write(post_path, rendered)
+            self.gen_post(post)
 
-    def gen_pages(self):
-        posts_filtered = []
+    def count_posts(self):
         for post in self.posts:
             if post.has_excluded_cats():
                 continue
-            posts_filtered.append(post)
-        size = len(posts_filtered)
+            self.posts_filtered.append(post)
+            self.posts_names.append(post.name)
+        size = len(self.posts_filtered)
+        return size
+
+    def count_pages(self, size):
         pages = math.ceil(float(size)/config.post_per_page) if size > config.post_per_page else 1
-        i = 1
-        while i <= pages:
-            offset = i*config.post_per_page - config.post_per_page
-            posts = posts_filtered[offset:offset+config.post_per_page]
-            rendered = self.render('index.html', posts=posts, page=i, total_pages=pages)
-            to = config.build if i == 1 else path.join(BLOG_PATH, 'page', str(i))
+        pages = int(pages)
+        return pages
+
+    def gen_pages(self, page):
+        size = self.count_posts()
+        pages = self.count_pages(size)
+        while page <= pages:
+            diff = pages * config.post_per_page - size
+            if page == pages:
+                offset = 0
+                offset_to = config.post_per_page if config.post_per_page < size else size
+                to = config.build
+            elif page == (pages - 1) and size > config.post_per_page:
+                offset = config.post_per_page
+                offset_to = (config.post_per_page * (pages + 1 - page)) - diff
+                to = path.join(BLOG_PATH, 'page', str(page))
+            else:
+                offset = (config.post_per_page * (pages - page)) - diff
+                offset_to = offset + config.post_per_page
+                to = path.join(BLOG_PATH, 'page', str(page))
+            posts = self.posts_filtered[offset:offset_to]
+            rendered = self.render('index.html', posts=posts, page=page, total_pages=pages)
             self.write(to, rendered)
-            i += 1
+            page += 1
 
     def gen_categories(self):
         categories = self.sort_by_categories(self.posts)
@@ -196,17 +235,17 @@ class Press:
             'author': config.author,
             'date': "%s&mdash;%s" % (self.first_press, datetime.now().year),
             'pages': self.pages,
-            'datetime_now': datetime.now().replace(tzinfo = TZ(), microsecond = 0)
+            'datetime_now': datetime.now().replace(tzinfo=TZ(), microsecond=0)
         }
         return template.render(dict(kwargs.items() + options.items()))
 
     def write(self, to, rendered, additional = 'index.html'):
         if not to.endswith('/'):
-            to = to + '/'
+            to += '/'
         if not path.exists(path.dirname(to)):
             makedirs(path.dirname(to))
         with open(path.join(to, additional), "w") as file:
-            file.write(rendered.encode('utf-8'))
+            file.write(rendered.encode('utf-8', 'ignore'))
 
     def get_base_template(self, name):
         template = Environment(loader=FileSystemLoader(config.templates))
@@ -237,7 +276,7 @@ class Press:
                     categories[category.link] = []
                 categories[category.link].append(post)
         return categories
-    
+
     def sort_by_feeds(self, posts):
         feeds = {}
         for post in posts:
@@ -246,11 +285,138 @@ class Press:
             feeds[post.categories[0]].append(post)
         return feeds
 
-class Octopress(Press):
+
+class LiveIndex(Press):
+    index_post = False
+
+    def get_post_page_number(self, name):
+        self.load_posts()
+
+        size = self.count_posts()
+        pages = self.count_pages(size)
+
+        posts_at_second_page = config.post_per_page - (pages * config.post_per_page - size)
+        post_index = self.posts_names.index(name)
+
+        post_per_page = int(config.post_per_page)
+        page = pages
+        pre_main_page = pages - 1
+
+        i = 0
+        j = post_per_page
+
+        while page > 0:
+            if page == pre_main_page:
+                i += j
+                j += posts_at_second_page
+            elif page != pages:
+                i = j
+                j += post_per_page
+            if post_index >= i and post_index < j:
+                return page
+            page -= 1
+
+    def is_main_page(self):
+        return False
+
+    def is_new_post(self):
+        return False
+
+    def update_index(self, post):
+        self.index_post = post
+
+        if self.is_new_post():
+            if self.is_main_page():
+                # self.update_cascade_up(post)
+                pass
+            else:
+                # self.update_cascade_up(post)
+                pass
+        else:
+            if self.is_main_page():
+                render = self.render_main_index()
+                self.update_simple(render)
+            else:
+
+                self.update_complex()
+
+    def render_main_index(self):
+        posts_filtered = []
+        i = 0
+        for name in self.posts_list:
+            post = self.load_post(name)
+            if post.has_excluded_cats():
+                continue
+            posts_filtered.append(post)
+            if i == config.post_per_page:
+                break
+            i += 1
+        posts = posts_filtered[0:-1]
+        render = self.render('index.html', posts=posts, page=0, total_pages=0)
+        return render
+
+    """ Update fast algo, for main page index only!
+    """
+    def update_simple(self, new_page):
+        soup_in = BeautifulSoup(new_page)
+        content = soup_in.find("div", {"class": self.main_class})
+        destination = path.join(config.build, self.prefix)
+        with open(destination, "r") as f:
+            temp_page = f.read()
+        soup_out = BeautifulSoup(temp_page)
+        b = soup_out.find("div", {"class": self.main_class})
+        b.replaceWith(content)
+        modified = unicode(str(soup_out), 'utf-8')
+        self.write(config.build, modified)
+
+    """ Update slow algo, for all indexes.
+    """
+    def update_complex(self):
+        print self.get_post_page_number(self.index_post.name)
+        #self.gen_pages(1)
+        pass
+
+class Octopress(LiveIndex):
+    def __init__(self):
+        """ 
+        TODO: implement it
+        """
+        self.first_press = 2010
+        self.posts = []
+        self.posts_list = []
+
     def load(self):
-        self.posts = [self.parse_post(f) for f in reversed(listdir(config.posts))
-            if path.isfile(path.join(config.posts, f)) and not f.startswith('.')
-        ]
+        self.load_posts()
+        self.load_pages()
+
+    def is_valid_post(self, name):
+        if path.isfile(path.join(config.posts, name)) and not name.startswith('.'):
+            return True
+        return False
+
+    def load_posts_list(self):
+        self.posts_list = reversed(listdir(config.posts))
+        print self.posts_list
+
+    def load_post(self, name):
+        try:
+            post = self.parse_post(name)
+        except Exception:
+            print 'Invalid file fotmat: ' + name
+
+        self.posts.append(post)
+        return post
+
+    def load_posts(self):
+        if not self.posts_list:
+            self.load_posts_list()
+
+        print self.posts_list
+        for f in self.posts_list:
+            if self.is_valid_post(f):
+                self.load_post(f)
+
+    def load_pages(self):
         self.pages = [self.parse_page(f) for f in reversed(listdir(config.pages))
             if path.isfile(path.join(config.pages, f)) and not f.startswith('.')
         ]
@@ -267,9 +433,17 @@ class Octopress(Press):
         content = body_list.pop(0)
         description = "".join(body_list)
 
-        time=re.search('(?<=time:).+', settings)
+        time = re.search('(?<=time:).+', settings)
+        regenerate = False
+
         if time:
-            time = time.group(0).strip().split(':')
+            clear_time = time.group(0).strip()
+
+            if clear_time == '-':
+                regenerate = True
+                time = ['00', '00']
+            else:
+                time = clear_time.split(':')
 
         categories = re.search('(?<=categories:).+', settings).group(0).strip()
         categoriesList = categories.split(',') if (',' in categories) else categories.split()
@@ -288,8 +462,8 @@ class Octopress(Press):
 
         date = Date(
             config=config,
-            year=name[:4], 
-            month=name[5:7], 
+            year=name[:4],
+            month=name[5:7],
             day=name[8:10],
             minute=time[0] if time else 0,
             second=time[1] if time else 0
@@ -297,14 +471,21 @@ class Octopress(Press):
 
         return Post(
             config=config,
-            date= date,
-            name=name[11:-9],
+            date=date,
+            name=self.parse_name_from_file(name),
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
             content=markdown(content, ['extra']),
             description=markdown(description, ['extra']),
             categories=categoriesList,
-            link=link
+            link=link,
+            regenerate=regenerate
         )
+
+    def parse_name_from_file(self, name):
+        r = re.compile("\d{4}-\d{2}-\d{2}-(.*)\.\w+")
+        m = r.match(name)
+        if m:
+            return m.group(1)
 
     def parse_page(self, name):
         f = file(path.join(config.pages, name), "r")
@@ -318,7 +499,40 @@ class Octopress(Press):
             content=markdown(body, ['extra'])
         )
 
+
+class PostsEventHandler(FileSystemEventHandler):
+
+    def on_moved(self, event):
+        pass
+
+    def on_created(self, event):
+        self.update_posting(event)
+
+    def on_deleted(self, event):
+        pass
+
+    def on_modified(self, event):
+        self.update_posting(event)
+
+    def update_posting(self, event):
+        engine = Octopress()
+        engine.load_pages()
+        engine.load_posts_list()
+        #engine.load_posts()
+        filename = path.basename(event.src_path)
+        if not filename.startswith('.') and not event.is_directory:
+            #try:
+            post = engine.parse_post(filename)
+            engine.update_index(post)
+            engine.gen_post(post)
+            print 'Post generated successfully.'
+            #except Exception:
+            #print 'Invalid post format.'
+        #engine.gen_main()
+
+
 class Server(BaseHTTPRequestHandler):
+
     def do_GET(self):
         try:
             if self.path[-1:] == '/':
@@ -332,9 +546,11 @@ class Server(BaseHTTPRequestHandler):
         except IOError:
             self.send_error(404, 'File not found')
 
+
 def action_sync():
     system("rsync -avrz %s %s" % (config.build + "/*", config.to))
     print('Sync done ...')
+
 
 def action_preview():
     server_address = ('127.0.0.1', 8080)
@@ -342,18 +558,24 @@ def action_preview():
     print('Http server is running on http://127.0.0.1:8080')
     httpd.serve_forever()
 
+
 def action_generate():
     engine = Octopress()
-    system("cp -r " + config.public + "/* " + config.build )
+    if not path.exists(config.build):
+        system("mkdir -p " + config.build)
+    system("cp -r " + config.public + "/* " + config.build)
     engine.generate()
+
 
 def action_gp():
     action_generate()
     action_preview()
 
+
 def action_gs():
     action_generate()
     action_sync()
+
 
 def action_init():
     init_path = path.expanduser('~') + '/Documents/Micropress/'
@@ -365,6 +587,21 @@ def action_init():
     if not path.exists(path.expanduser('~/.microrc')):
         copyfile(from_path + 'rctemplate', path.expanduser('~/.microrc'))
         print('Config successfully saved in ~/.microrc')
+
+
+def action_watch():
+    posts_path = config.posts
+    event_handler = PostsEventHandler()
+    observer = Observer()
+    observer.schedule(event_handler, posts_path, recursive=True)
+    observer.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
+
 
 if __name__ == '__main__':
     script.run()
