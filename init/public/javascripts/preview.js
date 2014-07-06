@@ -6,7 +6,10 @@
 			container = '.micropress-container',
 			
 			isMain = function() {
-				if (location.pathname == '/') {
+				if (
+					location.pathname == '/' 
+					|| location.pathname.indexOf("blog/page") > -1
+				) {
 					return true;
 				}
 				

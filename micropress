@@ -124,11 +124,8 @@ class Page(Entry):
 
 
 class Press:
-    main_class = 'mp-main'
+    main_class = 'micropress-main'
     prefix = 'index.html'
-
-    posts_filtered = []
-    posts_names = []
 
     def generate(self):
         self.load()
@@ -160,11 +157,8 @@ class Press:
             self.gen_post(post)
 
     def count_posts(self):
-        for post in self.posts:
-            if post.has_excluded_cats():
-                continue
-            self.posts_filtered.append(post)
-            self.posts_names.append(post.name)
+        if not self.posts_filtered:
+            self.load_posts()
         size = len(self.posts_filtered)
         return size
 
@@ -173,7 +167,7 @@ class Press:
         pages = int(pages)
         return pages
 
-    def gen_pages(self, page):
+    def gen_pages(self, page, end=None):
         size = self.count_posts()
         pages = self.count_pages(size)
         while page <= pages:
@@ -193,6 +187,10 @@ class Press:
             posts = self.posts_filtered[offset:offset_to]
             rendered = self.render('index.html', posts=posts, page=page, total_pages=pages)
             self.write(to, rendered)
+
+            if page == end:
+                break
+
             page += 1
 
     def gen_categories(self):
@@ -290,7 +288,6 @@ class LiveIndex(Press):
     index_post = False
 
     def get_post_page_number(self, name):
-        self.load_posts()
 
         size = self.count_posts()
         pages = self.count_pages(size)
@@ -312,46 +309,29 @@ class LiveIndex(Press):
             elif page != pages:
                 i = j
                 j += post_per_page
-            if post_index >= i and post_index < j:
+            if j > post_index >= i:
                 return page
             page -= 1
 
     def is_main_page(self):
-        return False
-
-    def is_new_post(self):
-        return False
+        #if post
+        return True
 
     def update_index(self, post):
         self.index_post = post
 
-        if self.is_new_post():
-            if self.is_main_page():
-                # self.update_cascade_up(post)
-                pass
-            else:
-                # self.update_cascade_up(post)
-                pass
+        if post.regenerate:
+            self.update_cascade_up()
         else:
             if self.is_main_page():
                 render = self.render_main_index()
                 self.update_simple(render)
             else:
-
                 self.update_complex()
 
     def render_main_index(self):
-        posts_filtered = []
-        i = 0
-        for name in self.posts_list:
-            post = self.load_post(name)
-            if post.has_excluded_cats():
-                continue
-            posts_filtered.append(post)
-            if i == config.post_per_page:
-                break
-            i += 1
-        posts = posts_filtered[0:-1]
+        self.load_posts(config.post_per_page)
+        posts = self.posts_filtered[0:-1]
         render = self.render('index.html', posts=posts, page=0, total_pages=0)
         return render
 
@@ -372,17 +352,24 @@ class LiveIndex(Press):
     """ Update slow algo, for all indexes.
     """
     def update_complex(self):
-        print self.get_post_page_number(self.index_post.name)
-        #self.gen_pages(1)
-        pass
+        page = self.get_post_page_number(self.index_post.name)
+        self.gen_pages(page, page)
+
+    def update_cascade_up(self):
+        page = self.get_post_page_number(self.index_post.name)
+        self.gen_pages(page - 1)
 
 class Octopress(LiveIndex):
+
+    posts = []
+    posts_filtered = []
+    posts_names = []
+
     def __init__(self):
-        """ 
+        """
         TODO: implement it
         """
         self.first_press = 2010
-        self.posts = []
         self.posts_list = []
 
     def load(self):
@@ -396,25 +383,33 @@ class Octopress(LiveIndex):
 
     def load_posts_list(self):
         self.posts_list = reversed(listdir(config.posts))
-        print self.posts_list
 
-    def load_post(self, name):
-        try:
-            post = self.parse_post(name)
-        except Exception:
-            print 'Invalid file fotmat: ' + name
+    def load_posts(self, end=None):
 
-        self.posts.append(post)
-        return post
+        self.posts_filtered = []
+        self.posts_names = []
+        self.posts = []
 
-    def load_posts(self):
-        if not self.posts_list:
-            self.load_posts_list()
+        posts_list = reversed(listdir(config.posts))
 
-        print self.posts_list
-        for f in self.posts_list:
+        i = 0
+        for f in posts_list:
             if self.is_valid_post(f):
-                self.load_post(f)
+                try:
+                    post = self.parse_post(f)
+                except Exception:
+                    print 'Invalid file fotmat: ' + f
+
+                if not post.has_excluded_cats():
+                    self.posts_filtered.append(post)
+                    self.posts_names.append(post.name)
+
+                self.posts.append(post)
+
+                i += 1
+
+                if i == end:
+                    break
 
     def load_pages(self):
         self.pages = [self.parse_page(f) for f in reversed(listdir(config.pages))
@@ -517,8 +512,6 @@ class PostsEventHandler(FileSystemEventHandler):
     def update_posting(self, event):
         engine = Octopress()
         engine.load_pages()
-        engine.load_posts_list()
-        #engine.load_posts()
         filename = path.basename(event.src_path)
         if not filename.startswith('.') and not event.is_directory:
             #try:
