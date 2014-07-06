@@ -14,11 +14,7 @@ Micropress – Python blog generator for hackers.
 ## Usage 
 
 ``micropress generate`` — save public and generated content into build directory.   
-``micropress preview`` — blog preview on http://127.0.0.1:8080  
 ``micropress sync`` — upload content in production server.  
-
-``micropress gp`` - generate content and preview on http://127.0.0.1:8080    
-``micropress gs`` - generate and sync  
 
 ## Uninstall
 
@@ -55,7 +51,7 @@ vim ~/.microrc
 
     [storage]
     # сюда собирается блог после генерации
-    build = ~/Documents/Micropress/build 
+    build = ~/tmp/micropress
     
     # статические файлы, которые копируются в билд перед генерацией, robots.txt и т.д.
     public = ~/Documents/Micropress/public 
@@ -88,11 +84,7 @@ vim ~/.microrc
 ## Использование 
 
 ``micropress generate`` — сгенерировать страницы по набранным новостям и шаблонам (копируется в ~/Documents/Micropress/build/ по умолчанию)     
-``micropress preview`` — показать локально превью http://127.0.0.1:8080  
 ``micropress sync`` — выложить контент на свой сервер (путь указывается в конфиге [sync] to).  
-
-``micropress gp`` - сгенерировать ипоказать превью on http://127.0.0.1:8080    
-``micropress gs`` - сгенерировать и выложить  
 
 ## Удаление
 
