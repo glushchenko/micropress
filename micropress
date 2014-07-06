@@ -477,8 +477,9 @@ class PostsEventHandler(FileSystemEventHandler):
             except Exception:
                 print 'Invalid post format.'
 
-    def update_time(self, file):
-        src = path.join(config.posts, file)
+    @staticmethod
+    def update_time(filename):
+        src = path.join(config.posts, filename)
         with open(src) as f:
             content = f.read()
 
@@ -490,11 +491,18 @@ class PostsEventHandler(FileSystemEventHandler):
         with open(src, "w") as f:
             f.write(new)
 
+
 class Server(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
+            if not path.exists(config.build):
+                engine = Octopress()
+                system("mkdir -p " + config.build)
+                engine.generate()
+
             if self.path[-1:] == '/':
                 self.path += 'index.html'
+
             f = open(config.build + unquote(self.path))
             self.send_response(200)
             self.end_headers()
