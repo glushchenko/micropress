@@ -6,7 +6,7 @@ timezone_offset = 0
 post_per_page = 10
 
 [storage]
-build = ~/Documents/Micropress/build
+build = ~/tmp/micropress
 public = ~/Documents/Micropress/public
 templates = ~/Documents/Micropress/templates
 pages = ~/Documents/Micropress/sources/pages

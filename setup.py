@@ -17,5 +17,6 @@ setup(
         'Jinja2',
         'markdown',
         'Werkzeug',
+        'watchdog',
     ],
 )

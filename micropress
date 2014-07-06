@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import re, math, ConfigParser, time
+import re, math, ConfigParser, time, platform
 from os import path, listdir, makedirs, system
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urllib import unquote
@@ -456,6 +456,11 @@ class PostsEventHandler(FileSystemEventHandler):
         if not filename.startswith('.') and not event.is_directory:
             try:
                 engine = Octopress()
+
+                if not path.exists(config.build):
+                    system("mkdir -p " + config.build)
+                    engine.generate()
+
                 post = engine.parse_post(filename)
                 engine.load_pages()
                 engine.load_posts()
@@ -531,15 +536,48 @@ def action_gs():
 
 
 def action_init():
-    init_path = path.expanduser('~') + '/Documents/Micropress/'
-    if not path.exists(init_path):
-        makedirs(init_path, 0755)
-    from_path = get_python_lib() + '/micropress/init/'
-    system("cp -r " + from_path + " " + init_path )
-    system("rm " + init_path + "/rctemplate")
-    if not path.exists(path.expanduser('~/.microrc')):
-        copyfile(from_path + 'rctemplate', path.expanduser('~/.microrc'))
-        print('Config successfully saved in ~/.microrc')
+    if platform.system() in ('Linux', 'Darwin'):
+        src = path.join(get_python_lib(), 'micropress', 'init')
+        dst = path.expanduser('~/Documents/Micropress/')
+
+        if not path.exists(dst):
+            makedirs(dst, 0755)
+
+            # copy default public sources templates
+            system('cp -r ' + path.join(src, '*') + ' ' + dst)
+            system('rm -r ' + path.join(dst, 'launch_agents') + ' ' + path.join(dst, 'build'))
+            print 'Default src saved in ' + dst
+
+        # copy default config if not found
+        config_src = path.join(src, '.microrc')
+        config_dst = path.expanduser('~/.microrc')
+
+        if not path.exists(config_dst):
+            copyfile(config_src, config_dst)
+            print('Config successfully saved in ~/.microrc')
+
+    if platform.system() == 'Darwin':
+        launch_agents_src = path.join(src, 'launch_agents')
+        launch_agents_dst = '~/Library/LaunchAgents/'
+
+        watcher_name = 'co.fluder.micropress.watcher.plist'
+        preview_name = 'co.fluder.micropress.preview.plist'
+
+        watcher_src = path.join(launch_agents_src, watcher_name)
+        preview_src = path.join(launch_agents_src, preview_name)
+
+        watcher_dst = path.expanduser(launch_agents_dst + watcher_name)
+        preview_dst = path.expanduser(launch_agents_dst + preview_name)
+
+        copyfile(watcher_src, watcher_dst)
+        system('launchctl unload -w ' + watcher_dst)
+        system('launchctl load -w ' + watcher_dst)
+        print "Watcher LaunchAgents rule loaded successful."
+
+        copyfile(preview_src, preview_dst)
+        system('launchctl unload -w ' + preview_dst)
+        system('launchctl load -w ' + preview_dst)
+        print "Preview LaunchAgents rule loaded successful."
 
 
 def action_watch():

@@ -1,0 +1,13 @@
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>co.fluder.micropress.watcher</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/usr/local/bin/micropress</string>
+      <string>watch</string>
+    </array>
+    <key>KeepAlive</key>
+    <true/>
+  </dict>
+</plist>
