@@ -14,7 +14,6 @@ from werkzeug import script
 from markdown import markdown
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from BeautifulSoup import BeautifulSoup
 
 
 class Config:
@@ -378,36 +377,36 @@ class Octopress(Press):
         f = file(path.join(config.posts, name), "r")
         post = f.read().decode('utf-8')
 
-        list = post.split('---')
-        settings = list.pop(1)
-        body = "".join(list)
+        explode = post.split('---')
+        settings = explode.pop(1)
+        body = "".join(explode)
 
         body_list = body.split('<!-- more -->')
         content = body_list.pop(0)
         description = "".join(body_list)
 
-        time = re.search('(?<=time:).+', settings)
+        time_rows = re.search('(?<=time:).+', settings)
         regenerate = False
 
-        if time:
-            clear_time = time.group(0).strip()
+        if time_rows:
+            clear_time = time_rows.group(0).strip()
 
             if clear_time == '-':
                 regenerate = True
-                time = ['00', '00']
+                time_rows = ['00', '00']
             else:
-                time = clear_time.split(':')
+                time_rows = clear_time.split(':')
 
         categories = re.search('(?<=categories:).+', settings).group(0).strip()
-        categoriesList = categories.split(',') if (',' in categories) else categories.split()
+        categories_list = categories.split(',') if (',' in categories) else categories.split()
 
-        for key, item in enumerate(categoriesList):
-            categoryLink = categoryName = item.strip()
-            if ('/' in item):
-                splitted = item.split("/", 1)
-                categoryLink = splitted[1].strip()
-                categoryName = splitted[0].strip()
-            categoriesList[key] = Category(link=categoryLink, name=categoryName)
+        for key, item in enumerate(categories_list):
+            category_link = category_name = item.strip()
+            if '/' in item:
+                explode = item.split("/", 1)
+                category_link = explode[1].strip()
+                category_name = explode[0].strip()
+            categories_list[key] = Category(link=category_link, name=category_name)
 
         link = re.search('(?<=link:).+', settings)
         if link:
@@ -418,8 +417,8 @@ class Octopress(Press):
             year=name[:4],
             month=name[5:7],
             day=name[8:10],
-            minute=time[0] if time else 0,
-            second=time[1] if time else 0
+            minute=time_rows[0] if time_rows else 0,
+            second=time_rows[1] if time_rows else 0
         )
 
         return Post(
@@ -429,7 +428,7 @@ class Octopress(Press):
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
             content=markdown(content, ['extra']),
             description=markdown(description, ['extra']),
-            categories=categoriesList,
+            categories=categories_list,
             link=link,
             regenerate=regenerate
         )
@@ -443,9 +442,9 @@ class Octopress(Press):
     def parse_page(self, name):
         f = file(path.join(config.pages, name), "r")
         page = f.read().decode('utf-8')
-        list = page.split('---')
-        settings = list.pop(1)
-        body = "".join(list)
+        explode = page.split('---')
+        settings = explode.pop(1)
+        body = "".join(explode)
         return Page(
             name=name[:-9],
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
