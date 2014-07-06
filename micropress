@@ -38,6 +38,12 @@ class Config:
             }
             if option in ['templates', 'pages', 'posts', 'public', 'build']:
                 return path.expanduser(self._parser.get('storage', option))
+            elif option == 'blog_path':
+                return path.join(self.build, "blog")
+            elif option == 'categories_path':
+                return path.join(self.blog_path, "categories")
+            elif option == 'archives_path':
+                return path.join(self.blog_path, "archives")
             elif option == 'exclude_category':
                 try:
                     return self._parser.get('system', option).split(',')
@@ -51,12 +57,6 @@ class Config:
                 return self._parser.get('system', option)
 
 config = Config()
-
-if config.is_parsed:
-    BLOG_PATH = path.join(config.build, "blog")
-    CATEGORIES = path.join(BLOG_PATH, "categories")
-    ARCHIVES = path.join(BLOG_PATH, "archives")
-
 
 class Entry:
     def __init__(self, *initial_data, **kwargs):
@@ -114,8 +114,8 @@ class Post(Entry):
     def has_excluded_cats(self):
         for category in self.categories:
             if category.name in config.exclude_category:
-                return True;
-        return False;
+                return True
+        return False
 
 
 class Page(Entry):
@@ -155,7 +155,7 @@ class Press:
         self.gen_index_range(page, end)
 
     def gen_post(self, post):
-        post_path = path.join(BLOG_PATH, post.date.year, post.date.month, post.date.day, post.name)
+        post_path = path.join(config.blog_path, post.date.year, post.date.month, post.date.day, post.name)
         rendered = self.render('article.html', post=post)
         self.write(post_path, rendered)
 
@@ -186,11 +186,11 @@ class Press:
             elif page == (pages - 1) and size > config.post_per_page:
                 offset = config.post_per_page
                 offset_to = (config.post_per_page * (pages + 1 - page)) - diff
-                to = path.join(BLOG_PATH, 'page', str(page))
+                to = path.join(config.blog_path, 'page', str(page))
             else:
                 offset = (config.post_per_page * (pages - page)) - diff
                 offset_to = offset + config.post_per_page
-                to = path.join(BLOG_PATH, 'page', str(page))
+                to = path.join(config.blog_path, 'page', str(page))
             posts = self.posts_filtered[offset:offset_to]
             rendered = self.render('index.html', posts=posts, page=page, total_pages=pages)
             self.write(to, rendered)
@@ -203,13 +203,13 @@ class Press:
     def gen_categories(self):
         categories = self.sort_by_categories(self.posts)
         for key, value in categories.iteritems():
-            category_path = path.join(CATEGORIES, key.lower())
+            category_path = path.join(config.categories_path, key.lower())
             rendered = self.render('categories.html', years=self.sort_by_years(value), categories=key)
             self.write(category_path, rendered)
 
     def gen_archives(self):
         rendered = self.render('categories.html', years=self.sort_by_years(self.posts, True))
-        self.write(ARCHIVES, rendered)
+        self.write(config.archives_path, rendered)
 
     def gen_feed(self):
         rendered = self.render('atom.xml', posts=self.posts_filtered[0:30], )
@@ -218,7 +218,7 @@ class Press:
     def gen_subfeeds(self):
         feeds = self.sort_by_feeds(self.posts)
         for key, value in feeds.iteritems():
-            category_path = path.join(CATEGORIES, key.link.lower())
+            category_path = path.join(config.categories_path, key.link.lower())
             rendered = self.render('atom.xml', posts=value, category=key)
             self.write(category_path, rendered, 'atom.xml')
 
@@ -495,14 +495,8 @@ class PostsEventHandler(FileSystemEventHandler):
 class Server(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
-            if not path.exists(config.build):
-                engine = Octopress()
-                system("mkdir -p " + config.build)
-                engine.generate()
-
             if self.path[-1:] == '/':
                 self.path += 'index.html'
-
             f = open(config.build + unquote(self.path))
             self.send_response(200)
             self.end_headers()
@@ -563,6 +557,10 @@ def action_init():
         if not path.exists(config_dst):
             copyfile(config_src, config_dst)
             print('Config successfully saved in ~/.microrc')
+
+        global config
+        config = Config()
+        action_generate()
 
     if platform.system() == 'Darwin':
         launch_agents_src = path.join(src, 'launch_agents')

@@ -9,7 +9,7 @@ except:
 
 setup(
     name='Micropress',
-    version='0.1.6',
+    version='0.1.9',
     author='Oleksandr Glushchenko',
     author_email='contact@fluder.co',
     url='https://github.com/glushchenko/micropress',
