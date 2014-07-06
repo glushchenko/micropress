@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import re, math, ConfigParser, time
-from os import path, listdir, makedirs, system, remove
+from os import path, listdir, makedirs, system
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urllib import unquote
 from datetime import datetime, tzinfo, timedelta
@@ -123,21 +123,22 @@ class Page(Entry):
 
 
 class Press:
-    main_class = 'micropress-main'
-    prefix = 'index.html'
-
     def generate(self):
         self.load()
         self.load_first_press()
-        print "Parsing done ..."
+        print "Load complete."
+        self.generate_partially()
         self.gen_articles()
-        print "Generation done ..."
         self.gen_index_range(1)
+        self.gen_static()
+        print "Generation done."
+
+    def generate_partially(self):
         self.gen_categories()
         self.gen_archives()
         self.gen_feed()
         self.gen_subfeeds()
-        self.gen_static()
+        print "Generation partially done."
 
     def load_first_press(self):
         year = datetime.now().year
@@ -211,12 +212,7 @@ class Press:
         self.write(ARCHIVES, rendered)
 
     def gen_feed(self):
-        posts_filtered = []
-        for post in self.posts:
-            if post.has_excluded_cats():
-                continue
-            posts_filtered.append(post)
-        rendered = self.render('atom.xml', posts=posts_filtered[0:30], )
+        rendered = self.render('atom.xml', posts=self.posts_filtered[0:30], )
         self.write(config.build, rendered, 'atom.xml')
 
     def gen_subfeeds(self):
@@ -291,17 +287,9 @@ class Press:
 
 
 class Octopress(Press):
-
     posts = []
     posts_filtered = []
     posts_names = []
-
-    def __init__(self):
-        """
-        TODO: implement it
-        """
-        self.first_press = 2010
-        self.posts_list = []
 
     def load(self):
         self.load_posts()
@@ -311,9 +299,6 @@ class Octopress(Press):
         if path.isfile(path.join(config.posts, name)) and not name.startswith('.'):
             return True
         return False
-
-    def load_posts_list(self):
-        self.posts_list = reversed(listdir(config.posts))
 
     def load_posts(self, end=None):
 
@@ -329,7 +314,7 @@ class Octopress(Press):
                 try:
                     post = self.parse_post(f)
                 except Exception:
-                    print 'Invalid file fotmat: ' + f
+                    print 'Invalid file format: ' + f
 
                 if not post.has_excluded_cats():
                     self.posts_filtered.append(post)
@@ -424,6 +409,7 @@ class Octopress(Press):
         return Post(
             config=config,
             date=date,
+            file=name,
             name=self.parse_name_from_file(name),
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
             content=markdown(content, ['extra']),
@@ -453,12 +439,11 @@ class Octopress(Press):
 
 
 class PostsEventHandler(FileSystemEventHandler):
-
     def on_moved(self, event):
         pass
 
     def on_created(self, event):
-        self.generate(event)
+        pass
 
     def on_deleted(self, event):
         pass
@@ -467,25 +452,44 @@ class PostsEventHandler(FileSystemEventHandler):
         self.generate(event)
 
     def generate(self, event):
-        engine = Octopress()
-        engine.load_pages()
         filename = path.basename(event.src_path)
         if not filename.startswith('.') and not event.is_directory:
             try:
+                engine = Octopress()
                 post = engine.parse_post(filename)
+                engine.load_pages()
+                engine.load_posts()
+                engine.load_first_press()
+
+                if post.regenerate:
+                    self.update_time(post.file)
+                    engine.generate_partially()
+
                 engine.gen_index_by_post(post)
                 engine.gen_post(post)
+
                 print 'Post generated successfully.'
             except Exception:
                 print 'Invalid post format.'
 
+    def update_time(self, file):
+        src = path.join(config.posts, file)
+        with open(src) as f:
+            content = f.read()
+
+        d = datetime.now()
+        current_time = 'time: ' + str(d.hour) + ':' + str(d.minute)
+        f = re.compile('(time: -)')
+        new = f.sub(current_time, content)
+
+        with open(src, "w") as f:
+            f.write(new)
 
 class Server(BaseHTTPRequestHandler):
-
     def do_GET(self):
         try:
             if self.path[-1:] == '/':
-                self.path = self.path + 'index.html'
+                self.path += 'index.html'
             f = open(config.build + unquote(self.path))
             self.send_response(200)
             self.end_headers()
