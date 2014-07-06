@@ -27,7 +27,7 @@ class Config:
 
     def __getattr__(self, option):
         if self.is_parsed:
-            list = {
+            config_list = {
                 'month': 'locale',
                 'days': 'locale',
                 'public': 'storage',
@@ -45,8 +45,8 @@ class Config:
                     return []
             elif option == 'post_per_page':
                 return int(self._parser.get('system', option))
-            elif list.has_key(option):
-                return self._parser.get(list[option], option).decode('utf-8')
+            elif config_list.has_key(option):
+                return self._parser.get(config_list[option], option).decode('utf-8')
             else:
                 return self._parser.get('system', option)
 

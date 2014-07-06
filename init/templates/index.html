@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+    <div class="micropress-main">
     {% for post in posts %}
         <article class="post">
             <h2 class="title">
@@ -22,17 +23,19 @@
             </div>
         </article>
     {% endfor %}
+    </div>
     {% if total_pages > 1 %}
         <nav id="pagenavi">
         {% if page > 1 %}
-            {% if page == 2 %}
-            <a href="/" class="prev">Назад</a>
-            {% else %}
             <a href="/blog/page/{{ page - 1}}/" class="prev">Назад</a>
-            {% endif %}
         {% endif %}
+            
         {% if page < total_pages %}
-            <a href="/blog/page/{{ page + 1 }}/" class="next">Далее</a>
+            {% if (page + 1) == total_pages %}
+                <a href="/" class="next">Далее</a>
+            {% else %}
+                <a href="/blog/page/{{ page + 1 }}/" class="next">Далее</a>
+            {% endif %}
         {% endif %}
             <div class="center"><a href="/blog/archives/">Архив</a></div>
         </nav>
