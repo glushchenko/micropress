@@ -133,7 +133,7 @@ class Press:
         print "Parsing done ..."
         self.gen_articles()
         print "Generation done ..."
-        self.gen_pages(1)
+        self.gen_index_range(1)
         self.gen_categories()
         self.gen_archives()
         self.gen_feed()
@@ -146,6 +146,13 @@ class Press:
             if int(post.date.year) < year:
                 year = post.date.year
         self.first_press = year
+
+    def gen_index_by_post(self, post):
+        page = self.get_post_page_number(post.name)
+        end = None
+        if not post.regenerate:
+            end = page
+        self.gen_index_range(page, end)
 
     def gen_post(self, post):
         post_path = path.join(BLOG_PATH, post.date.year, post.date.month, post.date.day, post.name)
@@ -167,7 +174,7 @@ class Press:
         pages = int(pages)
         return pages
 
-    def gen_pages(self, page, end=None):
+    def gen_index_range(self, page, end=None):
         size = self.count_posts()
         pages = self.count_pages(size)
         while page <= pages:
@@ -284,82 +291,7 @@ class Press:
         return feeds
 
 
-class LiveIndex(Press):
-    index_post = False
-
-    def get_post_page_number(self, name):
-
-        size = self.count_posts()
-        pages = self.count_pages(size)
-
-        posts_at_second_page = config.post_per_page - (pages * config.post_per_page - size)
-        post_index = self.posts_names.index(name)
-
-        post_per_page = int(config.post_per_page)
-        page = pages
-        pre_main_page = pages - 1
-
-        i = 0
-        j = post_per_page
-
-        while page > 0:
-            if page == pre_main_page:
-                i += j
-                j += posts_at_second_page
-            elif page != pages:
-                i = j
-                j += post_per_page
-            if j > post_index >= i:
-                return page
-            page -= 1
-
-    def is_main_page(self):
-        #if post
-        return True
-
-    def update_index(self, post):
-        self.index_post = post
-
-        if post.regenerate:
-            self.update_cascade_up()
-        else:
-            if self.is_main_page():
-                render = self.render_main_index()
-                self.update_simple(render)
-            else:
-                self.update_complex()
-
-    def render_main_index(self):
-        self.load_posts(config.post_per_page)
-        posts = self.posts_filtered[0:-1]
-        render = self.render('index.html', posts=posts, page=0, total_pages=0)
-        return render
-
-    """ Update fast algo, for main page index only!
-    """
-    def update_simple(self, new_page):
-        soup_in = BeautifulSoup(new_page)
-        content = soup_in.find("div", {"class": self.main_class})
-        destination = path.join(config.build, self.prefix)
-        with open(destination, "r") as f:
-            temp_page = f.read()
-        soup_out = BeautifulSoup(temp_page)
-        b = soup_out.find("div", {"class": self.main_class})
-        b.replaceWith(content)
-        modified = unicode(str(soup_out), 'utf-8')
-        self.write(config.build, modified)
-
-    """ Update slow algo, for all indexes.
-    """
-    def update_complex(self):
-        page = self.get_post_page_number(self.index_post.name)
-        self.gen_pages(page, page)
-
-    def update_cascade_up(self):
-        page = self.get_post_page_number(self.index_post.name)
-        self.gen_pages(page - 1)
-
-class Octopress(LiveIndex):
+class Octopress(Press):
 
     posts = []
     posts_filtered = []
@@ -415,6 +347,32 @@ class Octopress(LiveIndex):
         self.pages = [self.parse_page(f) for f in reversed(listdir(config.pages))
             if path.isfile(path.join(config.pages, f)) and not f.startswith('.')
         ]
+
+    def get_post_page_number(self, name):
+
+        size = self.count_posts()
+        pages = self.count_pages(size)
+
+        posts_at_second_page = config.post_per_page - (pages * config.post_per_page - size)
+        post_index = self.posts_names.index(name)
+
+        post_per_page = int(config.post_per_page)
+        page = pages
+        pre_main_page = pages - 1
+
+        i = 0
+        j = post_per_page
+
+        while page > 0:
+            if page == pre_main_page:
+                i += j
+                j += posts_at_second_page
+            elif page != pages:
+                i = j
+                j += post_per_page
+            if j > post_index >= i:
+                return page
+            page -= 1
 
     def parse_post(self, name):
         f = file(path.join(config.posts, name), "r")
@@ -501,27 +459,26 @@ class PostsEventHandler(FileSystemEventHandler):
         pass
 
     def on_created(self, event):
-        self.update_posting(event)
+        self.generate(event)
 
     def on_deleted(self, event):
         pass
 
     def on_modified(self, event):
-        self.update_posting(event)
+        self.generate(event)
 
-    def update_posting(self, event):
+    def generate(self, event):
         engine = Octopress()
         engine.load_pages()
         filename = path.basename(event.src_path)
         if not filename.startswith('.') and not event.is_directory:
-            #try:
-            post = engine.parse_post(filename)
-            engine.update_index(post)
-            engine.gen_post(post)
-            print 'Post generated successfully.'
-            #except Exception:
-            #print 'Invalid post format.'
-        #engine.gen_main()
+            try:
+                post = engine.parse_post(filename)
+                engine.gen_index_by_post(post)
+                engine.gen_post(post)
+                print 'Post generated successfully.'
+            except Exception:
+                print 'Invalid post format.'
 
 
 class Server(BaseHTTPRequestHandler):
