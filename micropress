@@ -619,7 +619,7 @@ def action_watch():
 
 
 def action_add(name=('n', '')):
-    template_dst = config.posts + time.strftime("%Y-%m-%d") + '-' + name + '.markdown'
+    template_dst = path.join(config.posts, '') + time.strftime("%Y-%m-%d") + '-' + name + '.markdown'
     template_src = path.join(get_python_lib(), 'micropress', 'init', 'templates', 'base.markdown')
     copyfile(template_src, template_dst)
     system("vim " + template_dst)
