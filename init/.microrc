@@ -14,6 +14,7 @@ posts = ~/Documents/Micropress/sources/posts
 
 [sync]
 to = remote.host.name:/path/to/www
+key = ~/.ssh/id_rsa
 
 [locale]
 month = Января, Февраля, Марта, Апреля, Мая, Июня, Июля, Августа, Сентября, Октября, Ноября, Декабря
