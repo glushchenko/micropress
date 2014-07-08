@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import re, math, ConfigParser, time, platform
+import re, math, ConfigParser, time, platform, os
+from subprocess import Popen, PIPE
 from os import path, listdir, makedirs, system
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urllib import unquote
@@ -34,7 +35,8 @@ class Config:
                 'templates': 'storage',
                 'pages': 'storage',
                 'posts': 'storage',
-                'to': 'sync'
+                'to': 'sync',
+                'key': 'sync'
             }
             if option in ['templates', 'pages', 'posts', 'public', 'build']:
                 return path.expanduser(self._parser.get('storage', option))
@@ -57,6 +59,7 @@ class Config:
                 return self._parser.get('system', option)
 
 config = Config()
+
 
 class Entry:
     def __init__(self, *initial_data, **kwargs):
@@ -150,7 +153,7 @@ class Press:
     def gen_index_by_post(self, post):
         page = self.get_post_page_number(post.name)
         end = None
-        if not post.regenerate:
+        if not post.sync:
             end = page
         self.gen_index_range(page, end)
 
@@ -301,7 +304,6 @@ class Octopress(Press):
         return False
 
     def load_posts(self, end=None):
-
         self.posts_filtered = []
         self.posts_names = []
         self.posts = []
@@ -315,15 +317,11 @@ class Octopress(Press):
                     post = self.parse_post(f)
                 except Exception:
                     print 'Invalid file format: ' + f
-
                 if not post.has_excluded_cats():
                     self.posts_filtered.append(post)
                     self.posts_names.append(post.name)
-
                 self.posts.append(post)
-
                 i += 1
-
                 if i == end:
                     break
 
@@ -370,15 +368,21 @@ class Octopress(Press):
         content = body_list.pop(0)
         description = "".join(body_list)
 
-        time_rows = re.search('(?<=time:).+', settings)
         regenerate = False
+        auto_sync = re.search('(?<=autosync:).+', settings)
+        if auto_sync:
+            sync = auto_sync.group(0).strip()
+            if sync == 'true':
+                regenerate = True
 
+        time_rows = re.search('(?<=time:).+', settings)
+
+        update_time = False
         if time_rows:
             clear_time = time_rows.group(0).strip()
-
             if clear_time == '-':
-                regenerate = True
                 time_rows = ['00', '00']
+                update_time = True
             else:
                 time_rows = clear_time.split(':')
 
@@ -416,7 +420,8 @@ class Octopress(Press):
             description=markdown(description, ['extra']),
             categories=categories_list,
             link=link,
-            regenerate=regenerate
+            sync=regenerate,
+            update_time=update_time
         )
 
     def parse_name_from_file(self, name):
@@ -453,6 +458,7 @@ class PostsEventHandler(FileSystemEventHandler):
 
     def generate(self, event):
         filename = path.basename(event.src_path)
+
         if not filename.startswith('.') and not event.is_directory:
             try:
                 engine = Octopress()
@@ -466,14 +472,30 @@ class PostsEventHandler(FileSystemEventHandler):
                 engine.load_posts()
                 engine.load_first_press()
 
-                if post.regenerate:
+                if post.update_time and post.sync:
                     self.update_time(post.file)
-                    engine.generate_partially()
 
+                engine.generate_partially()
                 engine.gen_index_by_post(post)
                 engine.gen_post(post)
 
+                if post.sync:
+                    try:
+                        cmd = "find /tmp/launch-*/Listeners -type s | head -1"
+                        ssh_auth_agent = os.popen(cmd).read().strip()
+                        identity_key = path.expanduser(config.key)
+                        source = path.join(config.build, '')
+                        ssh_args = ['-e', '/usr/bin/ssh -i ' + identity_key]
+                        args = ['/usr/bin/rsync', '-a', '-v', '-r'] + ssh_args + [source, config.to]
+                        env = dict(os.environ)
+                        env['SSH_AUTH_SOCK'] = ssh_auth_agent
+                        p = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
+                        p.communicate()
+                    except Exception:
+                        print 'Error running rsync.'
+
                 print 'Post generated successfully.'
+
             except Exception:
                 print 'Invalid post format.'
 
