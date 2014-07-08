@@ -331,7 +331,6 @@ class Octopress(Press):
         ]
 
     def get_post_page_number(self, name):
-
         size = self.count_posts()
         pages = self.count_pages(size)
 
@@ -523,7 +522,7 @@ class Server(BaseHTTPRequestHandler):
             f.close()
             return
         except IOError:
-            self.send_error(404, 'File not found')
+            self.send_error(404, 'File not found.')
 
 
 def action_sync():
