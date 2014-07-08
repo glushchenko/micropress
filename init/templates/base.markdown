@@ -1,10 +1,7 @@
 ---
 title: ""
-categories: 
-time:
+categories: common
+time: -
+autosync: false
 ---
-
-
-<!-- more -->
-
 
