@@ -504,12 +504,9 @@ class PostsEventHandler(FileSystemEventHandler):
         src = path.join(config.posts, filename)
         with open(src) as f:
             content = f.read()
-
-        d = datetime.now()
-        current_time = 'time: ' + str(d.hour) + ':' + str(d.minute)
+        current_time = 'time: ' + datetime.now().strftime('%H:%M')
         f = re.compile('(time: -)')
         new = f.sub(current_time, content)
-
         with open(src, "w") as f:
             f.write(new)
 
