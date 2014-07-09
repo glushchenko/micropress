@@ -315,15 +315,15 @@ class Octopress(Press):
             if self.is_valid_post(f):
                 try:
                     post = self.parse_post(f)
+                    if not post.has_excluded_cats():
+                        self.posts_filtered.append(post)
+                        self.posts_names.append(post.name)
+                    self.posts.append(post)
+                    i += 1
+                    if i == end:
+                        break
                 except Exception:
-                    print 'Invalid file format: ' + f
-                if not post.has_excluded_cats():
-                    self.posts_filtered.append(post)
-                    self.posts_names.append(post.name)
-                self.posts.append(post)
-                i += 1
-                if i == end:
-                    break
+                    pass
 
     def load_pages(self):
         self.pages = [self.parse_page(f) for f in reversed(listdir(config.pages))
@@ -493,7 +493,7 @@ class PostsEventHandler(FileSystemEventHandler):
                     except Exception:
                         print 'Error running rsync.'
 
-                print 'Post generated successfully.'
+                print 'Post dispatched successfully.'
 
             except Exception:
                 print 'Invalid post format.'
