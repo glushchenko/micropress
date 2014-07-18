@@ -4,91 +4,75 @@ Micropress – Python blog generator for hackers.
 
 ## Install
 
-``pip install micropress``  
-``micropress init`` — install config in home (~/.microrc) and default templates in ~/Documents/Micropress/ directory.   
+``sudo pip install micropress``  
+``micropress init`` — install default (~/.microrc) and default 
+templates (~/Documents/Micropress/) directory.
 
 ## Config
 
 ``vim ~/.microrc``
 
+    [system]
+    author = fluder
+    host = fluder.co
+    name = Geek Blog
+    timezone_offset = 120
+    post_per_page = 10
+    exclude_category = How-to
+
+    [storage]
+    build = ~/.build/micropress
+    public = ~/Documents/Micropress/public
+    templates = ~/Documents/Micropress/templates
+    pages = ~/Documents/Micropress/sources/pages
+    posts = ~/Documents/Micropress/sources/posts
+
+    [sync]
+    to = ripley.fluder.co:/var/www/fluder.co/public_html # rsync path
+    key = ~/.ssh/id_rsa # ssh key for autosync feature
+
+    [locale]
+    month = January, February, March, April, May, June, July, August, September, October, November, December
+    days = Mon, Tue, Wed, Thu, Fri, Sat, Sun
+
 ## Usage 
 
-``micropress generate`` — save public and generated content into build directory.   
-``micropress sync`` — upload content in production server.  
+``micropress add post-name`` then just write post, save and exit, working like a
+charm.
+
+### Linux 
+
+``micropress preview`` — start webserver preview  
+``micropress watch`` — start file changes watcher  
+
+### Manual mode
+
+``micropress generate`` — save public and generated content into build
+directory.  
+``micropress sync`` — upload content on production server.  
 
 ## Uninstall
 
 ``pip uninstall micropress``  
 ``rm ~/.microrc``  
 ``rm -r ~/Documents/Micropress``  
+``launchctl unload -w co.fluder.micropress.watcher.plist``  
+``launchctl unload -w co.fluder.micropress.preview.plist``  
+``rm -r ~/Library/LaunchAgents/co.fluder.micropress.watcher.plist``  
+``rm -r ~/Library/LaunchAgents/co.fluder.micropress.preview.plist``
 
---
+## Templates 
 
-## Установка
+Template engine is [Jinja2](http://jinja.pocoo.org/docs/), full support
+features.
 
-``pip install micropress``
-``micropress init`` — копирует начальный конфиг в домашнюю директорию (~/.microrc) и шаблоны по умолчанию в ~/Documents/Micropress/.
+## Headers
 
-## Конфиг
+    ---
+    title: ""
+    categories: View name/Link name
+    time: -        # automatic change on save if autisync enabled
+    autosync: true # automatic upload after edit
+    ---
 
-vim ~/.microrc
-
-    [system]
-    # авторство, по умолчанию этот ник используется как логин в дискасе
-    author = Micropress 
-    
-    # хост, в моём случае fluder.co, нужен для всех ссылок
-    host = host.name 
-    
-    # название блога в шаблонах
-    name = Micropress Blog 
-    
-    # таймзон, используется для строгого определения времени в RSS, 120 — означает GMT+2
-    timezone_offset = 0 
-    
-    # количество постов на страницу
-    post_per_page = 10 
-
-    [storage]
-    # сюда собирается блог после генерации
-    build = ~/tmp/micropress
-    
-    # статические файлы, которые копируются в билд перед генерацией, robots.txt и т.д.
-    public = ~/Documents/Micropress/public 
-    
-    # шаблоны
-    templates = ~/Documents/Micropress/templates
-    
-    # страницы вне ленты
-    pages = ~/Documents/Micropress/sources/pages
-     
-    # посты в ленте
-    posts = ~/Documents/Micropress/sources/posts 
-
-    [sync]
-    # сюда выкладываем то, что есть в билд директории (через rsync)
-    to = remote.host.name:/path/to/www
-
-    [locale]
-    # локализация месяцев
-    month = Января, Февраля, Марта, Апреля, Мая, Июня, Июля, Августа, Сентября, Октября, Ноября, Декабря
-    
-    # дней недели
-    days = Пн, Вт, Ср, Чт, Пт, Сб, Вс
-
-## Шаблоны
-
-Синтаксис шаблонов построен на [Jinja2](http://jinja.pocoo.org/docs/). Вы можете использовать в полной мере все фичи 
-этого шаблонизатора.
-
-## Использование 
-
-``micropress generate`` — сгенерировать страницы по набранным новостям и шаблонам (копируется в ~/Documents/Micropress/build/ по умолчанию)     
-``micropress sync`` — выложить контент на свой сервер (путь указывается в конфиге [sync] to).  
-
-## Удаление
-
-``pip uninstall micropress``  
-``rm ~/.microrc``  
-``rm -r ~/Documents/Micropress``  
 
