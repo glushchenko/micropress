@@ -7,10 +7,10 @@ Micropress – Python blog generator for hackers.
 - configurable directories and configs  
 - smart file tree organization  
 - markdown markup  
-- auto detect changes and generation  
+- auto detect changes and generation  
 - auto upload  
 - auto filling post time  
-- live preview at [http://127.0.0.1:8080](http://127.0.0.1:8080)
+- live preview at [http://127.0.0.1:8080](http://127.0.0.1:8080)
 
 ### Install
 
