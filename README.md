@@ -1,14 +1,24 @@
-# Micropress
+## Micropress
 
 Micropress – Python blog generator for hackers.  
 
-## Install
+- open source
+- jinja templates
+- configurable directories and configs
+- smart file tree organization
+- markdown markup
+- auto detect changes and generation
+- auto upload
+- auto filling post time
+- live preview at [http://127.0.0.1:8080](http://127.0.0.1:8080)
+
+### Install
 
 ``sudo pip install micropress``  
 ``micropress init`` — install default (~/.microrc) and default 
 templates (~/Documents/Micropress/) directory.
 
-## Config
+### Config
 
 ``vim ~/.microrc``
 
@@ -35,23 +45,23 @@ templates (~/Documents/Micropress/) directory.
     month = January, February, March, April, May, June, July, August, September, October, November, December
     days = Mon, Tue, Wed, Thu, Fri, Sat, Sun
 
-## Usage 
+### Usage 
 
 ``micropress add post-name`` then just write post, save and exit, working like a
 charm.
 
-### Linux 
+#### Linux 
 
 ``micropress preview`` — start webserver preview  
 ``micropress watch`` — start file changes watcher  
 
-### Manual mode
+#### Manual mode
 
 ``micropress generate`` — save public and generated content into build
 directory.  
 ``micropress sync`` — upload content on production server.  
 
-## Uninstall
+### Uninstall
 
 ``pip uninstall micropress``  
 ``rm ~/.microrc``  
@@ -61,12 +71,12 @@ directory.
 ``rm -r ~/Library/LaunchAgents/co.fluder.micropress.watcher.plist``  
 ``rm -r ~/Library/LaunchAgents/co.fluder.micropress.preview.plist``
 
-## Templates 
+### Templates 
 
 Template engine is [Jinja2](http://jinja.pocoo.org/docs/), full support
 features.
 
-## Headers
+### Headers
 
     ---
     title: ""
@@ -74,5 +84,3 @@ features.
     time: -        # automatic change on save if autisync enabled
     autosync: true # automatic upload after edit
     ---
-
-
