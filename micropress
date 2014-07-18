@@ -151,7 +151,7 @@ class Press:
         self.first_press = year
 
     def gen_index_by_post(self, post):
-        page = self.get_post_page_number(post.name)
+        page = self.get_post_page_number(post.name) - 1
         end = None
         if not post.sync:
             end = page
