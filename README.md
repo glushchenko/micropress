@@ -38,7 +38,7 @@ templates (~/Documents/Micropress/) directory.
     posts = ~/Documents/Micropress/sources/posts
 
     [sync]
-    to = ripley.fluder.co:/var/www/fluder.co/public_html # rsync path
+    to = remote.host.name:/path/to/www # rsync path
     key = ~/.ssh/id_rsa # ssh key for autosync feature
 
     [locale]
@@ -81,6 +81,6 @@ features.
     ---
     title: ""
     categories: View name/Link name
-    time: -        # automatic change on save if autisync enabled
+    time: -        # automatic change on save if autosync enabled
     autosync: true # automatic upload after edit
     ---

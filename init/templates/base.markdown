@@ -1,6 +1,6 @@
 ---
 title: ""
-categories: common
+categories: Common
 time: -
 autosync: false
 ---

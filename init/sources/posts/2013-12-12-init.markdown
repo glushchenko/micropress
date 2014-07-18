@@ -1,6 +1,6 @@
 ---
 title: "Hello world"
-categories: Разработка/Development
+categories: Dev/Development
 time: -
 autosync: false
 ---

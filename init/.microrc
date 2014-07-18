@@ -17,5 +17,5 @@ to = remote.host.name:/path/to/www
 key = ~/.ssh/id_rsa
 
 [locale]
-month = Января, Февраля, Марта, Апреля, Мая, Июня, Июля, Августа, Сентября, Октября, Ноября, Декабря
-days = Пн, Вт, Ср, Чт, Пт, Сб, Вс
+month = January, February, March, April, May, June, July, August, September, October, November, December
+days = Mon, Tue, Wed, Thu, Fri, Sat, Sun
