@@ -8,8 +8,8 @@ except:
     long_description = u"Blog generator for hackers."
 
 setup(
-    name='micropress',
-    version='0.2.2',
+    name='Micropress',
+    version='0.2.3',
     author='Oleksandr Glushchenko',
     author_email='contact@fluder.co',
     url='https://github.com/glushchenko/micropress',

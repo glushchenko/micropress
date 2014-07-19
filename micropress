@@ -152,10 +152,7 @@ class Press:
 
     def gen_index_by_post(self, post):
         page = self.get_post_page_number(post.name) - 1
-        end = None
-        if not post.sync:
-            end = page
-        self.gen_index_range(page, end)
+        self.gen_index_range(page)
 
     def gen_post(self, post):
         post_path = path.join(config.blog_path, post.date.year, post.date.month, post.date.day, post.name)
