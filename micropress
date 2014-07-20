@@ -476,11 +476,11 @@ class PostsEventHandler(FileSystemEventHandler):
                 if post.update_time and post.sync:
                     self.update_time(post.file)
 
-                engine.generate_partially()
                 engine.gen_index_by_post(post)
                 engine.gen_post(post)
 
                 if post.sync:
+                    engine.generate_partially()
                     try:
                         cmd = "find /tmp/launch-*/Listeners -type s | head -1"
                         ssh_auth_agent = os.popen(cmd).read().strip()
