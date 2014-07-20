@@ -26,8 +26,12 @@
     </section>
     {% endfor %}
 {% endblock %}
-{% block meta %}
-<meta name="robots" content="noindex, follow">
+{% block title %}
+    {% if archive %}
+        Archive -
+    {% elif not archive %}
+        {{ categories }} —
+    {% endif %}
 {% endblock %}
 
 

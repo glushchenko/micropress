@@ -41,6 +41,8 @@
         </nav>
     {% endif %}
 {% endblock %}
-{% block meta %}
-<meta name="robots" content="noindex, follow">
+{% block title %}
+    {% if page != total_pages %}
+        Page {{ page }} -
+    {% endif %}
 {% endblock %}
