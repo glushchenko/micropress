@@ -140,6 +140,7 @@ class Press:
         self.gen_categories()
         self.gen_archives()
         self.gen_feed()
+        self.gen_sitemap()
         self.gen_subfeeds()
         print "Generation partially done."
 
@@ -214,6 +215,10 @@ class Press:
     def gen_feed(self):
         rendered = self.render('atom.xml', posts=self.posts_filtered[0:30], )
         self.write(config.build, rendered, 'atom.xml')
+
+    def gen_sitemap(self):
+        rendered = self.render('sitemap.xml', posts=self.posts_filtered)
+        self.write(config.build, rendered, 'sitemap.xml')
 
     def gen_subfeeds(self):
         feeds = self.sort_by_feeds(self.posts)
