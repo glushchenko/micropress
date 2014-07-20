@@ -209,7 +209,7 @@ class Press:
             self.write(category_path, rendered)
 
     def gen_archives(self):
-        rendered = self.render('categories.html', years=self.sort_by_years(self.posts, True))
+        rendered = self.render('categories.html', years=self.sort_by_years(self.posts, True), archive=True)
         self.write(config.archives_path, rendered)
 
     def gen_feed(self):
