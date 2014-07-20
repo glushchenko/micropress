@@ -1,7 +1,7 @@
 [system]
 author = Micropress
 host = host.name
-name = Demo Blog
+name = Demo
 timezone_offset = 0
 post_per_page = 10
 
