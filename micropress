@@ -482,6 +482,7 @@ class PostsEventHandler(FileSystemEventHandler):
                 if post.sync:
                     engine.generate_partially()
                     try:
+                        print 'Rsync started.'
                         ssh_auth_agent = self.get_ssh_agent()
                         identity_key = path.expanduser(config.key)
                         source = path.join(config.build, '')
@@ -500,7 +501,7 @@ class PostsEventHandler(FileSystemEventHandler):
                 print 'Invalid post format.'
 
     @staticmethod
-    def get_ssh_agent(self):
+    def get_ssh_agent():
         if platform.system() == 'Darwin' and platform.mac_ver()[0] == '10.10':
             cmd = "find /tmp/com.apple.launchd.*/Listeners -type s | head -1"
         else:
