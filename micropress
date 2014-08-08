@@ -482,8 +482,7 @@ class PostsEventHandler(FileSystemEventHandler):
                 if post.sync:
                     engine.generate_partially()
                     try:
-                        cmd = "find /tmp/launch-*/Listeners -type s | head -1"
-                        ssh_auth_agent = os.popen(cmd).read().strip()
+                        ssh_auth_agent = self.get_ssh_agent()
                         identity_key = path.expanduser(config.key)
                         source = path.join(config.build, '')
                         ssh_args = ['-e', '/usr/bin/ssh -i ' + identity_key]
@@ -499,6 +498,15 @@ class PostsEventHandler(FileSystemEventHandler):
 
             except Exception:
                 print 'Invalid post format.'
+
+    @staticmethod
+    def get_ssh_agent(self):
+        if platform.system() == 'Darwin' and platform.mac_ver()[0] == '10.10':
+            cmd = "find /tmp/com.apple.launchd.*/Listeners -type s | head -1"
+        else:
+            cmd = "find /tmp/launch-*/Listeners -type s | head -1"
+        ssh_auth_agent = os.popen(cmd).read().strip()
+        return ssh_auth_agent
 
     @staticmethod
     def update_time(filename):
@@ -623,8 +631,11 @@ def action_watch():
 def action_add(name=('n', '')):
     template_dst = path.join(config.posts, '') + time.strftime("%Y-%m-%d") + '-' + name + '.md'
     template_src = path.join(get_python_lib(), 'micropress', 'init', 'templates', 'base.markdown')
-    copyfile(template_src, template_dst)
-    system("vim " + template_dst)
+    if os.path.isfile(template_dst):
+        print 'File exist already.'
+    else:
+        copyfile(template_src, template_dst)
+        system("vim " + template_dst)
 
 
 if __name__ == '__main__':
