@@ -502,10 +502,7 @@ class PostsEventHandler(FileSystemEventHandler):
 
     @staticmethod
     def get_ssh_agent():
-        if platform.system() == 'Darwin' and platform.mac_ver()[0] == '10.10':
-            cmd = "find /tmp/com.apple.launchd.*/Listeners -type s | head -1"
-        else:
-            cmd = "find /tmp/launch-*/Listeners -type s | head -1"
+        cmd = "find /tmp/com.apple.launchd.*/Listeners -type s | head -1"
         ssh_auth_agent = os.popen(cmd).read().strip()
         return ssh_auth_agent
 
