@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ post.title }} - {% endblock %}
+{% block meta %}
+    {% if post.meta_desc %}
+        <meta name="description" content="{{ post.meta_desc }}">
+    {% endif %}
+ {% endblock %}
 {% block content %}
 <article class="post post__full">
     <h2 class="title">

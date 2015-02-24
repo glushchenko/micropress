@@ -417,6 +417,7 @@ class Octopress(Press):
             file=name,
             name=self.parse_name_from_file(name),
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
+            meta_desc=re.search('(?<=meta_desc:).+', settings).group(0).strip()[1:-1],
             content=markdown(content, ['extra']),
             description=markdown(description, ['extra']),
             categories=categories_list,

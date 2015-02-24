@@ -14,11 +14,7 @@
     {% for post in posts %}
     <entry>
         <title type="html"><![CDATA[{{ post.title }}]]></title>       
-        {% if post.link %}
-            <link href="{{ post.link }}"/>
-        {% else %}
-            <link href="{{ post.get_url() }}"/>
-        {% endif %}  
+        <link rel="alternate" href="{% if post.link %}{{ post.link }}{% else %}{{ post.get_url() }}{% endif %}"/>
         <updated>{{ post.date.get_iso() }}</updated>
         <id>{{ post.get_url() }}</id>
         <content type="html"><![CDATA[
