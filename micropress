@@ -411,13 +411,17 @@ class Octopress(Press):
             second=time_rows[1] if time_rows else 0
         )
 
+        meta_desc = re.search('(?<=meta_desc:).+', settings);
+        if meta_desc:
+            meta_desc = meta_desc.group(0).strip()[1:-1]
+
         return Post(
             config=config,
             date=date,
             file=name,
             name=self.parse_name_from_file(name),
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
-            meta_desc=re.search('(?<=meta_desc:).+', settings).group(0).strip()[1:-1],
+            meta_desc=meta_desc,
             content=markdown(content, ['extra']),
             description=markdown(description, ['extra']),
             categories=categories_list,
