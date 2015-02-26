@@ -10,7 +10,7 @@ from datetime import datetime, tzinfo, timedelta
 from shutil import copyfile
 from distutils.sysconfig import get_python_lib
 from jinja2.loaders import FileSystemLoader
-from jinja2 import Environment
+from jinja2 import Environment, TemplateNotFound
 from werkzeug import script
 from markdown import markdown
 from watchdog.observers import Observer
@@ -134,6 +134,7 @@ class Press:
         self.gen_articles()
         self.gen_index_range(1)
         self.gen_static()
+        self.gen_error()
         print "Generation done."
 
     def generate_partially(self):
@@ -231,6 +232,13 @@ class Press:
         for page in self.pages:
             rendered = self.render('page.html', page=page)
             self.write(path.join(config.build, page.name), rendered)
+
+    def gen_error(self):
+        try:
+            rendered = self.render('error.html')
+            self.write(config.build, rendered, 'error.html')
+        except TemplateNotFound:
+            pass
 
     def render(self, template, **kwargs):
         template = self.get_base_template(template)
