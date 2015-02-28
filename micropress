@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import re, math, ConfigParser, time, platform, os
+import re, math, ConfigParser, time, platform, os, codecs
 from subprocess import Popen, PIPE
 from os import path, listdir, makedirs, system
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
@@ -23,7 +23,7 @@ class Config:
         self._parser = ConfigParser.RawConfigParser(allow_no_value=True)
         rc_path = path.expanduser('~/.microrc')
         if path.exists(rc_path):
-            self._parser.read(rc_path)
+            self._parser.readfp(codecs.open(rc_path, "r", "utf8"))
             self.is_parsed = True
 
     def __getattr__(self, option):
@@ -54,9 +54,12 @@ class Config:
             elif option == 'post_per_page':
                 return int(self._parser.get('system', option))
             elif config_list.has_key(option):
-                return self._parser.get(config_list[option], option).decode('utf-8')
+                return self._parser.get(config_list[option], option)
             else:
                 return self._parser.get('system', option)
+
+    def get_option(self, section, option):
+        return self._parser.get(section, option)
 
 config = Config()
 
@@ -205,8 +208,15 @@ class Press:
     def gen_categories(self):
         categories = self.sort_by_categories(self.posts)
         for key, value in categories.iteritems():
-            category_path = path.join(config.categories_path, key.lower())
-            rendered = self.render('categories.html', years=self.sort_by_years(value), categories=key)
+            category = key.lower()
+            category_path = path.join(config.categories_path, category)
+            try:
+                category_meta = config.get_option('meta', category)
+            except ConfigParser.NoOptionError:
+                category_meta = False
+            category_name = value[0].categories[0].name
+            rendered = self.render('categories.html', years=self.sort_by_years(value), categories=key,
+                                   category_name=category_name, category_meta=category_meta)
             self.write(category_path, rendered)
 
     def gen_archives(self):
