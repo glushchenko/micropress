@@ -84,3 +84,19 @@ features.
     time: -        # automatic change on save if autosync enabled
     autosync: true # automatic upload after edit
     ---
+
+### Sync options
+
+#### S3
+
+[sync]
+type = s3
+bucket = BUCKET_NAME
+access_key_id = ACCESS_KEY_ID
+secret_access_key = SECRET_ACCESS_KEY
+
+#### RSync
+
+[sync]
+to = remote.host.name:/path/to/www # rsync path
+key = ~/.ssh/id_rsa # ssh key for autosync feature

@@ -256,7 +256,7 @@ class Press:
             'host': config.host,
             'name': config.name,
             'author': config.author,
-            'date': "%s&mdash;%s" % (self.first_press, datetime.now().year),
+            'date': "%s&ndash;%s" % (self.first_press, datetime.now().year),
             'pages': self.pages,
             'datetime_now': datetime.now().replace(tzinfo=TZ(), microsecond=0)
         }
@@ -557,7 +557,22 @@ class Server(BaseHTTPRequestHandler):
 
 
 def action_sync():
-    system("rsync -avrz %s %s" % (config.build + "/*", config.to))
+    storage = False
+
+    try:
+        storage = config.get_option('sync', 'type')
+    except ConfigParser.NoOptionError:
+        pass
+
+    if (storage == 's3'):
+        bucket = config.get_option('sync', 'bucket')
+        access_key_id = config.get_option('sync', 'access_key_id')
+        secret_access_key = config.get_option('sync', 'secret_access_key')
+        system("s3cmd sync -r --delete-removed --access_key=%s --secret_key=%s --acl-public %s s3://%s"
+               % (access_key_id, secret_access_key, config.build + "/", bucket))
+    else:
+        system("rsync -avrz %s %s" % (config.build + "/*", config.to))
+
     print('Sync done ...')
 
 

@@ -9,7 +9,7 @@ except:
 
 setup(
     name='micropress',
-    version='0.2.12',
+    version='0.2.15',
     author='Oleksandr Glushchenko',
     author_email='contact@fluder.co',
     url='https://github.com/glushchenko/micropress',
@@ -23,5 +23,6 @@ setup(
         'markdown',
         'Werkzeug',
         'watchdog',
+        's3cmd'
     ],
 )
