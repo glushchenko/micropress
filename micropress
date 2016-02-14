@@ -129,24 +129,30 @@ class Page(Entry):
 
 
 class Press:
-    def generate(self):
+    def load_press(self):
         self.load()
         self.load_first_press()
-        print "Load complete."
-        self.generate_partially()
+        print "Load complete"
+
+    def generate_partially(self):
+        categories = self.gen_categories()
+        self.gen_archives()
+        self.gen_feed()
+        self.gen_sitemap()
+        self.gen_subfeeds(categories)
+        print "Generation partially done"
+
+    def generate_publishing(self):
         self.gen_articles()
         self.gen_index_range(1)
         self.gen_static()
         self.gen_error()
-        print "Generation done."
+        print "Generation done"
 
-    def generate_partially(self):
-        self.gen_categories()
-        self.gen_archives()
-        self.gen_feed()
-        self.gen_sitemap()
-        self.gen_subfeeds()
-        print "Generation partially done."
+    def generate(self):
+        self.load_press()
+        self.generate_partially()
+        self.generate_publishing()
 
     def load_first_press(self):
         year = datetime.now().year
@@ -212,12 +218,13 @@ class Press:
             category_path = path.join(config.categories_path, category)
             try:
                 category_meta = config.get_option('meta', category)
-            except ConfigParser.NoOptionError:
+            except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
                 category_meta = False
             category_name = value[0].categories[0].name
             rendered = self.render('categories.html', years=self.sort_by_years(value), categories=key,
                                    category_name=category_name, category_meta=category_meta)
             self.write(category_path, rendered)
+        return categories
 
     def gen_archives(self):
         rendered = self.render('categories.html', years=self.sort_by_years(self.posts, True), archive=True)
@@ -231,10 +238,9 @@ class Press:
         rendered = self.render('sitemap.xml', posts=self.posts_filtered)
         self.write(config.build, rendered, 'sitemap.xml')
 
-    def gen_subfeeds(self):
-        feeds = self.sort_by_feeds(self.posts)
-        for key, value in feeds.iteritems():
-            category_path = path.join(config.categories_path, key.link.lower())
+    def gen_subfeeds(self, categories):
+        for key, value in categories.iteritems():
+            category_path = path.join(config.categories_path, key.lower())
             rendered = self.render('atom.xml', posts=value, category=key)
             self.write(category_path, rendered, 'atom.xml')
 
@@ -504,30 +510,12 @@ class PostsEventHandler(FileSystemEventHandler):
 
                 if post.sync:
                     engine.generate_partially()
-                    try:
-                        print 'Rsync started.'
-                        ssh_auth_agent = self.get_ssh_agent()
-                        identity_key = path.expanduser(config.key)
-                        source = path.join(config.build, '')
-                        ssh_args = ['-e', '/usr/bin/ssh -i ' + identity_key]
-                        args = ['/usr/bin/rsync', '-a', '-v', '-r'] + ssh_args + [source, config.to]
-                        env = dict(os.environ)
-                        env['SSH_AUTH_SOCK'] = ssh_auth_agent
-                        p = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
-                        p.communicate()
-                    except Exception:
-                        print 'Error running rsync.'
+                    action_sync()
 
                 print 'Post dispatched successfully.'
 
             except Exception:
                 print 'Invalid post format.'
-
-    @staticmethod
-    def get_ssh_agent():
-        cmd = "find /tmp/com.apple.launchd.*/Listeners -type s | head -1"
-        ssh_auth_agent = os.popen(cmd).read().strip()
-        return ssh_auth_agent
 
     @staticmethod
     def update_time(filename):
@@ -553,27 +541,49 @@ class Server(BaseHTTPRequestHandler):
             f.close()
             return
         except IOError:
-            self.send_error(404, 'File not found.')
+            self.send_error(404, 'File not found')
 
 
 def action_sync():
     storage = False
-
     try:
         storage = config.get_option('sync', 'type')
     except ConfigParser.NoOptionError:
         pass
 
-    if (storage == 's3'):
+    if storage == 's3':
         bucket = config.get_option('sync', 'bucket')
         access_key_id = config.get_option('sync', 'access_key_id')
         secret_access_key = config.get_option('sync', 'secret_access_key')
-        system("s3cmd sync -r --delete-removed --access_key=%s --secret_key=%s --acl-public %s s3://%s"
+
+        system("/usr/local/bin/s3cmd sync -r --exclude=/logs --delete-removed --access_key=%s --secret_key=%s --acl-public %s s3://%s"
                % (access_key_id, secret_access_key, config.build + "/", bucket))
     else:
-        system("rsync -avrz %s %s" % (config.build + "/*", config.to))
+        try:
+            print 'RSync started.'
+            cmd = "find /tmp/com.apple.launchd.*/Listeners -type s | head -1"
+            ssh_auth_agent = os.popen(cmd).read().strip()
+            identity_key = path.expanduser(config.key)
+            source = path.join(config.build, '')
+            ssh_args = ['-e', '/usr/bin/ssh -i ' + identity_key]
+            args = ['/usr/bin/rsync', '-a', '-v', '-r'] + ssh_args + [source, config.to]
+            env = dict(os.environ)
+            env['SSH_AUTH_SOCK'] = ssh_auth_agent
+            p = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
+            p.communicate()
+        except Exception:
+            print 'Error running RSync.'
 
-    print('Sync done ...')
+    print('Sync done')
+
+
+def action_s3logs():
+    bucket = config.get_option('sync', 'bucket')
+    access_key_id = config.get_option('sync', 'access_key_id')
+    secret_access_key = config.get_option('sync', 'secret_access_key')
+
+    system("s3cmd sync -r --access_key=%s --secret_key=%s --acl-public s3://%s/logs %s"
+        % (access_key_id, secret_access_key, bucket, config.build + "/"))
 
 
 def action_preview():
