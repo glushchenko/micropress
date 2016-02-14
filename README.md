@@ -98,5 +98,5 @@ secret_access_key = SECRET_ACCESS_KEY
 #### RSync
 
 [sync]
-to = remote.host.name:/path/to/www # rsync path
+to = remote.host.name:/path/to/www # rsync path  
 key = ~/.ssh/id_rsa # ssh key for autosync feature
