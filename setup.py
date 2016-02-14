@@ -1,20 +1,26 @@
 from setuptools import setup
 from distutils.sysconfig import get_python_lib
-import os
+from distutils.version import StrictVersion
+import os, platform
 
 try:
     long_description = open('README.md').read()
 except:
     long_description = u"Blog generator for hackers."
 
+prefix = ''
+if StrictVersion('15.0.0') > StrictVersion(platform.release()):
+    prefix = get_python_lib()
+
+platform.release()
 setup(
     name='micropress',
-    version='0.2.16',
+    version='0.2.18',
     author='Oleksandr Glushchenko',
     author_email='contact@fluder.co',
     url='https://github.com/glushchenko/micropress',
     scripts = ['micropress'],
-    data_files= [(get_python_lib() + '/micropress/%s' % (x[0]), map(lambda y: x[0]+'/'+y, x[2])) for x in os.walk('init/')],
+    data_files= [(prefix + '/micropress/%s' % (x[0]), map(lambda y: x[0]+'/'+y, x[2])) for x in os.walk('init/')],
     license='LICENSE.txt',
     description='Blog generator for hackers.',
     long_description=long_description,
