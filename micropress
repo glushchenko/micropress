@@ -556,7 +556,7 @@ def action_sync():
         access_key_id = config.get_option('sync', 'access_key_id')
         secret_access_key = config.get_option('sync', 'secret_access_key')
 
-        system("/usr/local/bin/s3cmd sync -r --exclude=/logs --delete-removed --access_key=%s --secret_key=%s --acl-public %s s3://%s"
+        system("/usr/local/bin/s3cmd sync -r --exclude=/logs --delete-removed --access_key=%s --secret_key=%s --acl-public --no-mime-magic --guess-mime-type %s s3://%s"
                % (access_key_id, secret_access_key, config.build + "/", bucket))
     else:
         try:
