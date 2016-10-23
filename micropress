@@ -16,6 +16,14 @@ from markdown import markdown
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+from markdown import Extension
+from markdown.extensions import attr_list
+from markdown.inlinepatterns import IMAGE_LINK_RE, IMAGE_REFERENCE_RE
+from markdown.blockprocessors import BlockProcessor
+from markdown.util import etree
+
+from urlparse import urlparse
+from os.path import splitext, basename
 
 class Config:
     def __init__(self):
@@ -63,6 +71,168 @@ class Config:
 
 config = Config()
 
+FIGURES = [u'^\s*'+IMAGE_LINK_RE+ u'(\{\:?([^\}]*)\})?' + u'\s*$', u'^\s*'+IMAGE_REFERENCE_RE+u'\s*$']
+INLINE_LINK_RE = re.compile(r'\[([^\]]+)\]\(([^)]+)\)' + '(\{\:?([^\}]*)\})?')
+
+class ImagesProcessor(BlockProcessor):
+    FIGURES_RE = re.compile('|'.join(f for f in FIGURES))
+    def test(self, parent, block):
+        isImage = bool(self.FIGURES_RE.search(block))
+        isOnlyOneLine = (len(block.splitlines()) == 1)
+
+        if (isImage and isOnlyOneLine):
+            return True
+        else:
+            return False
+
+    def run(self, parent, blocks):
+        alt = url = attr = None
+
+        raw_block = blocks.pop(0)
+        mdImage = self.FIGURES_RE.search(raw_block).group(0)
+
+        rAlt = self.FIGURES_RE.search(raw_block)
+        if (rAlt):
+            alt = rAlt.group(1)
+
+        rUrl = INLINE_LINK_RE.search(mdImage)
+        if (rUrl):
+            url = rUrl.group(2)
+
+            disassembled = urlparse(url)
+            filename, file_ext = splitext(basename(disassembled.path))
+
+            find = filename + file_ext
+            replace = 'thumb/' + filename + file_ext
+            thumb = disassembled.path.replace(find, replace)
+
+            find = filename + file_ext
+            replace = 'thumb/' + filename + '@2x' + file_ext
+            hidpiThumb = disassembled.path.replace(find, replace)
+
+            img = etree.SubElement(parent, 'img')
+            img.set('data-src', thumb)
+            img.set('data-src-x2', hidpiThumb)
+            img.set('data-src-full', url)
+
+        rAttr = INLINE_LINK_RE.search(mdImage)
+        if (rAttr):
+            attr = INLINE_LINK_RE.search(mdImage).group(3)
+
+        image_size = {'width': 0, 'height': 0}
+        if (attr):
+            image_size = self.assignExtra(img, attr)
+
+        if (alt):
+            img.set('alt', alt)
+
+        noScript = etree.SubElement(parent,'noscript')
+        etree.SubElement(noScript, 'img', {'src': url})
+
+        width = image_size['width']
+        height = image_size['height']
+
+        script = '''\
+            THUMB_PATH=/Users/fluder/Documents/Blog/public/i/thumb
+
+            f=$0
+            width=$1
+            height=$2
+
+            if [ -z "$f" ]; then
+                files=/Users/fluder/Documents/Blog/public/i/*.png
+            else
+                files=/Users/fluder/Documents/Blog/public/i/$f.png
+            fi
+
+            for file in $files; do
+                file_name=$(echo $file | rev | cut -d"/" -f1 | rev | cut -d"." -f1)
+
+                if [ "$#" -eq 3 ] && ([ "$width" -gt 0 ] || [ "$height" -gt 0 ]); then
+                    if [ "$width" -gt 0 ]; then
+                        echo "in"
+                        W=`identify -format '%w' $file`
+                        double=$(($width * 2))
+                        convert "$file" -resize x$double "$THUMB_PATH/${file_name}@2x.png"
+                        convert "$file" -resize x$width "$THUMB_PATH/${file_name}.png"
+
+                    else
+                        H=`identify -format '%h' $file`
+                        echo $H
+                        echo $height
+                        double=$(($height * 2))
+                        echo $double
+                        convert "$file" -resize x$double "$THUMB_PATH/${file_name}@2x.png"
+                        convert "$file" -resize x$height "$THUMB_PATH/${file_name}.png"
+                    fi
+
+                    pngquant $THUMB_PATH/${file_name}@2x.png --ext .png --force
+                    pngquant $THUMB_PATH/${file_name}.png --ext .png --force
+
+                else
+                    W=`identify -format '%w' $file`
+
+                    if [ "$W" -gt 1600 ]
+                    then
+                        convert "$file" -resize 1600 "$THUMB_PATH/${file_name}@2x.png"
+                        convert "$file" -resize 800 "$THUMB_PATH/${file_name}.png"
+                    else
+                        cp $file "$THUMB_PATH/${file_name}@2x.png"
+                        convert "$THUMB_PATH/${file_name}@2x.png" -resize 50% "$THUMB_PATH/${file_name}.png"
+                    fi
+                fi
+            done
+        '''
+
+        import subprocess
+
+        command = ['bash', '-c', script, filename, str(width), str(height)]
+        proc = subprocess.Popen(command)
+        proc.communicate()[0]
+
+    # ![By default](/i/ukrainian-keyboard-default.png){: width=400} assign width i.e. <img width="400"/>
+    def assignExtra(self, img, attr):
+        image_size = {'width': 0, 'height': 0}
+
+        BASE_RE = r'\{\:?([^\}]*)\}'
+        INLINE_RE = re.compile(r'^%s' % BASE_RE)
+        NAME_RE = re.compile(r'[^A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff'
+                             r'\u0370-\u037d\u037f-\u1fff\u200c-\u200d'
+                             r'\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff'
+                             r'\uf900-\ufdcf\ufdf0-\ufffd'
+                             r'\:\-\.0-9\u00b7\u0300-\u036f\u203f-\u2040]+')
+
+        m = INLINE_RE.match(attr)
+        if (m):
+            attr = m.group(1)
+
+            for k, v in attr_list.get_attrs(attr):
+                if k == '.':
+                    cls = img.get('class')
+                    if cls:
+                        img.set('class', '%s %s' % (cls, v))
+                    else:
+                        img.set('class', v)
+                else:
+                    key = NAME_RE.sub('_', k)
+                    img.set(key, v)
+
+                    if (k == 'width'):
+                        image_size['width'] = v
+
+                    if (k == 'height'):
+                        image_size['height'] = v
+
+        return image_size
+
+
+class FigureCaptionExtension(Extension):
+    def extendMarkdown(self, md, md_globals):
+        md.parser.blockprocessors.add('retina', ImagesProcessor(md.parser), '<ulist')
+
+
+def makeExtension(configs={}):
+    return FigureCaptionExtension(configs=configs)
 
 class Entry:
     def __init__(self, *initial_data, **kwargs):
@@ -446,8 +616,8 @@ class Octopress(Press):
             name=self.parse_name_from_file(name),
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
             meta_desc=meta_desc,
-            content=markdown(content, ['extra']),
-            description=markdown(description, ['extra']),
+            content=markdown(content, ['extra', FigureCaptionExtension()]),
+            description=markdown(description, ['extra', FigureCaptionExtension()]),
             categories=categories_list,
             link=link,
             sync=regenerate,
@@ -469,7 +639,7 @@ class Octopress(Press):
         return Page(
             name=name[:-9],
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
-            content=markdown(body, ['extra'])
+            content=markdown(body, ['extra', FigureCaptionExtension()])
         )
 
 
