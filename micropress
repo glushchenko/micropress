@@ -88,6 +88,8 @@ class ImagesProcessor(BlockProcessor):
     def run(self, parent, blocks):
         alt = url = attr = None
 
+        public_dir = config.public
+
         raw_block = blocks.pop(0)
         mdImage = self.FIGURES_RE.search(raw_block).group(0)
 
@@ -103,11 +105,11 @@ class ImagesProcessor(BlockProcessor):
             filename, file_ext = splitext(basename(disassembled.path))
 
             find = filename + file_ext
-            replace = 'thumb/' + filename + file_ext
+            replace = '_/' + filename + file_ext
             thumb = disassembled.path.replace(find, replace)
 
             find = filename + file_ext
-            replace = 'thumb/' + filename + '@2x' + file_ext
+            replace = '_/' + filename + '@2x' + file_ext
             hidpiThumb = disassembled.path.replace(find, replace)
 
             img = etree.SubElement(parent, 'img')
@@ -133,60 +135,59 @@ class ImagesProcessor(BlockProcessor):
         height = image_size['height']
 
         script = '''\
-            THUMB_PATH=/Users/fluder/Documents/Blog/public/i/thumb
+            public_dir=$0
+            url=$1
+            width=$2
+            height=$3
 
-            f=$0
-            width=$1
-            height=$2
+            file=$public_dir$url
+            file_name=$(basename "$file")
+            ext="${file_name##*.}"
+            name="${file_name%.*}"
+            dir=$(dirname "${file}")/
 
-            if [ -z "$f" ]; then
-                files=/Users/fluder/Documents/Blog/public/i/*.png
-            else
-                files=/Users/fluder/Documents/Blog/public/i/$f.png
-            fi
+            THUMB_PATH=$dir"_"
 
-            for file in $files; do
-                file_name=$(echo $file | rev | cut -d"/" -f1 | rev | cut -d"." -f1)
+            [ -d $THUMB_PATH ] || mkdir $THUMB_PATH
 
-                if [ "$#" -eq 3 ] && ([ "$width" -gt 0 ] || [ "$height" -gt 0 ]); then
-                    if [ "$width" -gt 0 ]; then
-                        echo "in"
-                        W=`identify -format '%w' $file`
-                        double=$(($width * 2))
-                        convert "$file" -resize x$double "$THUMB_PATH/${file_name}@2x.png"
-                        convert "$file" -resize x$width "$THUMB_PATH/${file_name}.png"
-
-                    else
-                        H=`identify -format '%h' $file`
-                        echo $H
-                        echo $height
-                        double=$(($height * 2))
-                        echo $double
-                        convert "$file" -resize x$double "$THUMB_PATH/${file_name}@2x.png"
-                        convert "$file" -resize x$height "$THUMB_PATH/${file_name}.png"
-                    fi
-
-                    pngquant $THUMB_PATH/${file_name}@2x.png --ext .png --force
-                    pngquant $THUMB_PATH/${file_name}.png --ext .png --force
+            if [ "$#" -eq 3 ] && ([ "$width" -gt 0 ] || [ "$height" -gt 0 ]); then
+                if [ "$width" -gt 0 ]; then
+                    W=`identify -format '%w' $file`
+                    double=$(($width * 2))
+                    convert "$file" -resize x$double "$THUMB_PATH/${name}@2x.${ext}"
+                    convert "$file" -resize x$width "$THUMB_PATH/${name}.${ext}"
 
                 else
-                    W=`identify -format '%w' $file`
-
-                    if [ "$W" -gt 1600 ]
-                    then
-                        convert "$file" -resize 1600 "$THUMB_PATH/${file_name}@2x.png"
-                        convert "$file" -resize 800 "$THUMB_PATH/${file_name}.png"
-                    else
-                        cp $file "$THUMB_PATH/${file_name}@2x.png"
-                        convert "$THUMB_PATH/${file_name}@2x.png" -resize 50% "$THUMB_PATH/${file_name}.png"
-                    fi
+                    H=`identify -format '%h' $file`
+                    double=$(($height * 2))
+                    convert "$file" -resize x$double "$THUMB_PATH/${name}@2x.${ext}"
+                    convert "$file" -resize x$height "$THUMB_PATH/${name}.${ext}"
                 fi
-            done
+            else
+                W=`identify -format '%w' $file`
+
+                if [ "$W" -gt 1600 ]
+                then
+                    convert "$file" -resize 1600 "$THUMB_PATH/${name}@2x.${ext}"
+                    convert "$file" -resize 800 "$THUMB_PATH/${name}.${ext}"
+                else
+                    cp $file "$THUMB_PATH/${name}@2x.${ext}"
+                    convert "$THUMB_PATH/${name}@2x.${ext}" -resize 50% "$THUMB_PATH/${name}.${ext}"
+                fi
+            fi
+
+            if [ "$ext" == "png" ]; then
+                pngquant "$THUMB_PATH/${name}@2x.${ext}" --ext .${ext} --force
+                pngquant "$THUMB_PATH/${name}.${ext}" --ext .${ext} --force
+            else
+                pngquant "$THUMB_PATH/${name}@2x.${ext}" --ext='' --force
+                pngquant "$THUMB_PATH/${name}.${ext}" --ext='' --force
+            fi
         '''
 
         import subprocess
 
-        command = ['bash', '-c', script, filename, str(width), str(height)]
+        command = ['bash', '-c', script, public_dir, url, str(width), str(height)]
         proc = subprocess.Popen(command)
         proc.communicate()[0]
 
