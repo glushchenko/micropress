@@ -25,6 +25,8 @@ from markdown.util import etree
 from urlparse import urlparse
 from os.path import splitext, basename
 
+current_post = False
+
 class Config:
     def __init__(self):
         self.is_parsed = False
@@ -44,9 +46,10 @@ class Config:
                 'pages': 'storage',
                 'posts': 'storage',
                 'to': 'sync',
-                'key': 'sync'
+                'key': 'sync',
+                'cache': 'system'
             }
-            if option in ['templates', 'pages', 'posts', 'public', 'build']:
+            if option in ['templates', 'pages', 'posts', 'public', 'build', 'cache']:
                 return path.expanduser(self._parser.get('storage', option))
             elif option == 'blog_path':
                 return path.join(self.build, "blog")
@@ -71,11 +74,11 @@ class Config:
 
 config = Config()
 
-FIGURES = [u'^\s*'+IMAGE_LINK_RE+ u'(\{\:?([^\}]*)\})?' + u'\s*$', u'^\s*'+IMAGE_REFERENCE_RE+u'\s*$']
-INLINE_LINK_RE = re.compile(r'\[([^\]]*)\]\(([^)]+)\)(\{\:?([^\}]*)\})?')
-
 class ImagesProcessor(BlockProcessor):
+    FIGURES = [u'^\s*'+IMAGE_LINK_RE+ u'(\{\:?([^\}]*)\})?' + u'\s*$', u'^\s*'+IMAGE_REFERENCE_RE+u'\s*$']
+    INLINE_LINK_RE = re.compile(r'\[([^\]]*)\]\(([^)]+)\)(\{\:?([^\}]*)\})?')
     FIGURES_RE = re.compile('|'.join(f for f in FIGURES))
+
     def test(self, parent, block):
         isImage = bool(self.FIGURES_RE.search(block))
         isOnlyOneLine = (len(block.splitlines()) == 1)
@@ -88,8 +91,6 @@ class ImagesProcessor(BlockProcessor):
     def run(self, parent, blocks):
         alt = url = attr = None
 
-        public_dir = config.public
-
         raw_block = blocks.pop(0)
         mdImage = self.FIGURES_RE.search(raw_block).group(0)
 
@@ -97,43 +98,70 @@ class ImagesProcessor(BlockProcessor):
         if (rAlt):
             alt = rAlt.group(1)
 
-        rUrl = INLINE_LINK_RE.search(mdImage)
+        rUrl = self.INLINE_LINK_RE.search(mdImage)
         if (rUrl):
             url = rUrl.group(2)
 
+        rAttr = self.INLINE_LINK_RE.search(mdImage)
+        if (rAttr):
+            attr = self.INLINE_LINK_RE.search(mdImage).group(3)
+
+        public_dir = config.public
+        filepath = public_dir + url
+
+        width = height = 0
+        img = etree.SubElement(parent, 'img')
+
+        if (attr):
+            image_size = self.assignExtra(img, attr)
+            width = image_size['width']
+            height = image_size['height']
+
+        if (width == 0 and height == 0):
+            from PIL import Image
+            with Image.open(filepath) as im:
+                imageWidth, imageHeight = im.size
+                if (imageHeight > 400):
+                    height = 400
+
+        if (width > 0 or height > 0):
             disassembled = urlparse(url)
             filename, file_ext = splitext(basename(disassembled.path))
-
-            find = filename + file_ext
-            replace = '_/' + filename + file_ext
-            thumb = disassembled.path.replace(find, replace)
 
             find = filename + file_ext
             replace = '_/' + filename + '@2x' + file_ext
             hidpiThumb = disassembled.path.replace(find, replace)
 
-            img = etree.SubElement(parent, 'img')
-            img.set('data-src', thumb)
-            img.set('data-src-x2', hidpiThumb)
-            img.set('data-src-full', url)
+            find = filename + file_ext
+            replace = '_/' + filename + file_ext
+            thumb = disassembled.path.replace(find, replace)
 
-        rAttr = INLINE_LINK_RE.search(mdImage)
-        if (rAttr):
-            attr = INLINE_LINK_RE.search(mdImage).group(3)
+            img.set('srcset', hidpiThumb + ' 2x')
+            img.set('src', thumb)
+            img.set('data-src-original', url)
 
-        image_size = {'width': 0, 'height': 0}
-        if (attr):
-            image_size = self.assignExtra(img, attr)
+            if (height > 0):
+                img.set('height', str(height) + 'px')
+
+            if (width > 0):
+                img.set('width', str(width) + 'px')
+
+            # images cache
+
+            press = Press()
+            post = press.get_post_cache(current_post)
+
+            if not post or post['images_compressed'] == False:
+                self.convert(public_dir, url, height, width)
+                press.set_post_cache(current_post, {'images_compressed', True})
+
+        else:
+            img.set('src', url)
 
         if (alt):
             img.set('alt', alt)
 
-        noScript = etree.SubElement(parent,'noscript')
-        etree.SubElement(noScript, 'img', {'src': url})
-
-        width = image_size['width']
-        height = image_size['height']
-
+    def convert(self, public_dir, url, height=0, width=0):
         script = '''\
             public_dir=$0
             url=$1
@@ -298,6 +326,7 @@ class Post(Entry):
 class Page(Entry):
     pass
 
+posts_cache = 0
 
 class Press:
     def load_press(self):
@@ -485,6 +514,33 @@ class Press:
             feeds[post.categories[0]].append(post)
         return feeds
 
+    def get_post_cache(self, key):
+        import shelve
+        key = str(key)
+
+        filename = config.cache + '/posts.db'
+
+        try:
+            posts_cache = shelve.open(filename)
+
+            if posts_cache.has_key(key):
+                return posts_cache[key]
+
+            posts_cache.close()
+        except Exception as e:
+            print e
+
+    def set_post_cache(self, key, value):
+        key = str(key)
+
+        import shelve
+        filename = config.cache + '/posts.db'
+        try:
+            posts_cache = shelve.open(filename, writeback=True)
+            posts_cache[key] = value
+            posts_cache.close()
+        except Exception as e:
+            print e
 
 class Octopress(Press):
     posts = []
@@ -610,6 +666,14 @@ class Octopress(Press):
         if meta_desc:
             meta_desc = meta_desc.group(0).strip()[1:-1]
 
+        try:
+            cache = self.get_post_cache(name)
+        except:
+            cache = None
+
+        global current_post
+        current_post = name
+
         return Post(
             config=config,
             date=date,
@@ -622,7 +686,8 @@ class Octopress(Press):
             categories=categories_list,
             link=link,
             sync=regenerate,
-            update_time=update_time
+            update_time=update_time,
+            cache=cache
         )
 
     def parse_name_from_file(self, name):
@@ -724,11 +789,16 @@ def action_sync():
 
     if storage == 's3':
         bucket = config.get_option('sync', 'bucket')
+        build = config.build + "/"
+
         access_key_id = config.get_option('sync', 'access_key_id')
         secret_access_key = config.get_option('sync', 'secret_access_key')
 
-        system("/usr/local/bin/s3cmd sync -r --exclude=/logs --delete-removed --access_key=%s --secret_key=%s --acl-public --no-mime-magic --guess-mime-type %s s3://%s"
-               % (access_key_id, secret_access_key, config.build + "/", bucket))
+        s3cmd = "/usr/local/bin/s3cmd sync -r --access_key=%s --secret_key=%s --acl-public --no-mime-magic --guess-mime-type" % (access_key_id, secret_access_key)
+
+        system(s3cmd + " --rexclude='.css$|.js$|.jpg|.png|.css|$' %s s3://%s" % (build, bucket))
+        system(s3cmd + " --rinclude='.css$|.js$|.jpg|.png|.css|$' --add-header='Cache-Control:max-age=604800' --cf-invalidate %s s3://%s" % (build, bucket))
+
     else:
         try:
             print 'RSync started.'
