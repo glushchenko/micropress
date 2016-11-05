@@ -146,15 +146,6 @@ class ImagesProcessor(BlockProcessor):
             if (width > 0):
                 img.set('width', str(width) + 'px')
 
-            # images cache
-
-            press = Press()
-            post = press.get_post_cache(current_post)
-
-            if not post or post['images_compressed'] == False:
-                self.convert(public_dir, url, height, width)
-                press.set_post_cache(current_post, {'images_compressed', True})
-
         else:
             img.set('src', url)
 
@@ -530,6 +521,7 @@ class Press:
         except Exception as e:
             print e
 
+
     def set_post_cache(self, key, value):
         key = str(key)
 
@@ -796,8 +788,8 @@ def action_sync():
 
         s3cmd = "/usr/local/bin/s3cmd sync -r --access_key=%s --secret_key=%s --acl-public --no-mime-magic --guess-mime-type" % (access_key_id, secret_access_key)
 
-        system(s3cmd + " --rexclude='.css$|.js$|.jpg|.png|.css|$' %s s3://%s" % (build, bucket))
-        system(s3cmd + " --rinclude='.css$|.js$|.jpg|.png|.css|$' --add-header='Cache-Control:max-age=604800' --cf-invalidate %s s3://%s" % (build, bucket))
+        system(s3cmd + " --rexclude='.css$|.js$|.jpg|.png|.gif|$' %s s3://%s" % (build, bucket))
+        system(s3cmd + " --rinclude='.css$|.js$|.jpg|.png|.gif|$' --add-header='Cache-Control:max-age=604800' --cf-invalidate %s s3://%s" % (build, bucket))
 
     else:
         try:
