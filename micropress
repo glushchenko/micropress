@@ -25,7 +25,6 @@ from markdown.util import etree
 from urlparse import urlparse
 from os.path import splitext, basename
 
-current_post = False
 
 class Config:
     def __init__(self):
@@ -73,6 +72,34 @@ class Config:
         return self._parser.get(section, option)
 
 config = Config()
+
+
+class Cache:
+    @staticmethod
+    def get(key):
+        import shelve
+        key = str(key)
+        filename = config.cache + '/posts.db'
+        try:
+            posts_cache = shelve.open(filename)
+            if posts_cache.has_key(key):
+                return posts_cache[key]
+            posts_cache.close()
+        except Exception as e:
+            print e
+
+    @staticmethod
+    def set(key, value):
+        import shelve
+        key = str(key)
+        filename = config.cache + '/posts.db'
+        try:
+            posts_cache = shelve.open(filename, writeback=True)
+            posts_cache[key] = value
+            posts_cache.close()
+        except Exception as e:
+            print e
+
 
 class ImagesProcessor(BlockProcessor):
     FIGURES = [u'^\s*'+IMAGE_LINK_RE+ u'(\{\:?([^\}]*)\})?' + u'\s*$', u'^\s*'+IMAGE_REFERENCE_RE+u'\s*$']
@@ -141,10 +168,22 @@ class ImagesProcessor(BlockProcessor):
             img.set('data-src-original', url)
 
             if (height > 0):
-                img.set('height', str(height) + 'px')
+                img.set('max-height', str(height) + 'px')
 
             if (width > 0):
-                img.set('width', str(width) + 'px')
+                img.set('max-width', str(width) + 'px')
+
+            cache_key = '[images] ' + filepath
+            file_size = os.stat(filepath).st_size
+            previous_size = Cache.get(cache_key)
+
+            if (previous_size and previous_size != file_size) or not previous_size:
+                print 'Image compressing [' + filename + ']'
+                print 'Height [' + str(height) + 'px]'
+                print 'Width: [' + str(width) + 'px]'
+
+                self.convert(public_dir, url, height, width)
+                Cache.set(cache_key, file_size)
 
         else:
             img.set('src', url)
@@ -173,8 +212,8 @@ class ImagesProcessor(BlockProcessor):
                 if [ "$width" -gt 0 ]; then
                     W=`identify -format '%w' $file`
                     double=$(($width * 2))
-                    convert "$file" -resize x$double "$THUMB_PATH/${name}@2x.${ext}"
-                    convert "$file" -resize x$width "$THUMB_PATH/${name}.${ext}"
+                    convert "$file" -resize $double "$THUMB_PATH/${name}@2x.${ext}"
+                    convert "$file" -resize $width "$THUMB_PATH/${name}.${ext}"
 
                 else
                     H=`identify -format '%h' $file`
@@ -505,34 +544,6 @@ class Press:
             feeds[post.categories[0]].append(post)
         return feeds
 
-    def get_post_cache(self, key):
-        import shelve
-        key = str(key)
-
-        filename = config.cache + '/posts.db'
-
-        try:
-            posts_cache = shelve.open(filename)
-
-            if posts_cache.has_key(key):
-                return posts_cache[key]
-
-            posts_cache.close()
-        except Exception as e:
-            print e
-
-
-    def set_post_cache(self, key, value):
-        key = str(key)
-
-        import shelve
-        filename = config.cache + '/posts.db'
-        try:
-            posts_cache = shelve.open(filename, writeback=True)
-            posts_cache[key] = value
-            posts_cache.close()
-        except Exception as e:
-            print e
 
 class Octopress(Press):
     posts = []
@@ -658,14 +669,6 @@ class Octopress(Press):
         if meta_desc:
             meta_desc = meta_desc.group(0).strip()[1:-1]
 
-        try:
-            cache = self.get_post_cache(name)
-        except:
-            cache = None
-
-        global current_post
-        current_post = name
-
         return Post(
             config=config,
             date=date,
@@ -679,7 +682,6 @@ class Octopress(Press):
             link=link,
             sync=regenerate,
             update_time=update_time,
-            cache=cache
         )
 
     def parse_name_from_file(self, name):
@@ -742,8 +744,8 @@ class PostsEventHandler(FileSystemEventHandler):
 
                 print 'Post dispatched successfully.'
 
-            except Exception:
-                print 'Invalid post format.'
+            except Exception as e:
+                print 'Invalid post format or permissions not found'
 
     @staticmethod
     def update_time(filename):
@@ -790,10 +792,29 @@ def action_sync():
 
         system(s3cmd + " --rexclude='.css$|.js$|.jpg|.png|.gif|$' %s s3://%s" % (build, bucket))
         system(s3cmd + " --rinclude='.css$|.js$|.jpg|.png|.gif|$' --add-header='Cache-Control:max-age=604800' --cf-invalidate %s s3://%s" % (build, bucket))
+    elif storage == 'git':
+        build = config.build + "/"
+        command = '/usr/bin/git -C ' + build
+        system(command + " add . ")
+        system(command + " commit -m %s" % ('"Micropress autogenerator update"'))
 
+        # push
+        try:
+            print 'git push started'
+            cmd = "find /tmp/com.apple.launchd.*/Listeners -type s | head -1"
+            ssh_auth_agent = os.popen(cmd).read().strip()
+            identity_key = path.expanduser(config.key)
+            args = ['/usr/bin/git', '-C', build, 'push']
+            env = dict(os.environ)
+            env['SSH_AUTH_SOCK'] = ssh_auth_agent
+            env['GIT_SSH_COMMAND'] = "ssh -i " + identity_key
+            p = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
+            p.communicate()
+        except Exception:
+            print 'Error running git push'
     else:
         try:
-            print 'RSync started.'
+            print 'rsync started'
             cmd = "find /tmp/com.apple.launchd.*/Listeners -type s | head -1"
             ssh_auth_agent = os.popen(cmd).read().strip()
             identity_key = path.expanduser(config.key)
@@ -805,7 +826,7 @@ def action_sync():
             p = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
             p.communicate()
         except Exception:
-            print 'Error running RSync.'
+            print 'Error running rsync'
 
     print('Sync done')
 
@@ -830,8 +851,8 @@ def action_generate():
     engine = Octopress()
     if not path.exists(config.build):
         system("mkdir -p " + config.build)
-    system("cp -r " + config.public + "/* " + config.build)
     engine.generate()
+    system("cp -r " + config.public + "/* " + config.build)
 
 
 def action_gp():
