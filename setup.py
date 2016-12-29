@@ -29,6 +29,7 @@ setup(
         'markdown',
         'Werkzeug',
         'watchdog',
-        's3cmd'
+        's3cmd',
+        'Pillow'
     ],
 )

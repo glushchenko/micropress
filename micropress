@@ -16,6 +16,15 @@ from markdown import markdown
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+from markdown import Extension
+from markdown.extensions import attr_list
+from markdown.inlinepatterns import IMAGE_LINK_RE, IMAGE_REFERENCE_RE
+from markdown.blockprocessors import BlockProcessor
+from markdown.util import etree
+
+from urlparse import urlparse
+from os.path import splitext, basename
+
 
 class Config:
     def __init__(self):
@@ -36,9 +45,10 @@ class Config:
                 'pages': 'storage',
                 'posts': 'storage',
                 'to': 'sync',
-                'key': 'sync'
+                'key': 'sync',
+                'cache': 'system'
             }
-            if option in ['templates', 'pages', 'posts', 'public', 'build']:
+            if option in ['templates', 'pages', 'posts', 'public', 'build', 'cache']:
                 return path.expanduser(self._parser.get('storage', option))
             elif option == 'blog_path':
                 return path.join(self.build, "blog")
@@ -63,6 +73,225 @@ class Config:
 
 config = Config()
 
+
+class Cache:
+    @staticmethod
+    def get(key):
+        import shelve
+        key = str(key)
+        filename = config.cache + '/posts.db'
+        try:
+            posts_cache = shelve.open(filename)
+            if posts_cache.has_key(key):
+                return posts_cache[key]
+            posts_cache.close()
+        except Exception as e:
+            print e
+
+    @staticmethod
+    def set(key, value):
+        import shelve
+        key = str(key)
+        filename = config.cache + '/posts.db'
+        try:
+            posts_cache = shelve.open(filename, writeback=True)
+            posts_cache[key] = value
+            posts_cache.close()
+        except Exception as e:
+            print e
+
+
+class ImagesProcessor(BlockProcessor):
+    FIGURES = [u'^\s*'+IMAGE_LINK_RE+ u'(\{\:?([^\}]*)\})?' + u'\s*$', u'^\s*'+IMAGE_REFERENCE_RE+u'\s*$']
+    INLINE_LINK_RE = re.compile(r'\[([^\]]*)\]\(([^)]+)\)(\{\:?([^\}]*)\})?')
+    FIGURES_RE = re.compile('|'.join(f for f in FIGURES))
+
+    def test(self, parent, block):
+        isImage = bool(self.FIGURES_RE.search(block))
+        isOnlyOneLine = (len(block.splitlines()) == 1)
+
+        if (isImage and isOnlyOneLine):
+            return True
+        else:
+            return False
+
+    def run(self, parent, blocks):
+        alt = url = attr = None
+
+        raw_block = blocks.pop(0)
+        mdImage = self.FIGURES_RE.search(raw_block).group(0)
+
+        rAlt = self.FIGURES_RE.search(raw_block)
+        if (rAlt):
+            alt = rAlt.group(1)
+
+        rUrl = self.INLINE_LINK_RE.search(mdImage)
+        if (rUrl):
+            url = rUrl.group(2)
+
+        rAttr = self.INLINE_LINK_RE.search(mdImage)
+        if (rAttr):
+            attr = self.INLINE_LINK_RE.search(mdImage).group(3)
+
+        public_dir = config.public
+        filepath = public_dir + url
+
+        width = height = 0
+        img = etree.SubElement(parent, 'img')
+
+        if (attr):
+            image_size = self.assignExtra(img, attr)
+            width = image_size['width']
+            height = image_size['height']
+
+        if (width == 0 and height == 0):
+            from PIL import Image
+            with Image.open(filepath) as im:
+                imageWidth, imageHeight = im.size
+                if (imageHeight > 400):
+                    height = 400
+
+        if (width > 0 or height > 0):
+            disassembled = urlparse(url)
+            filename, file_ext = splitext(basename(disassembled.path))
+
+            find = filename + file_ext
+            replace = '_/' + filename + '@2x' + file_ext
+            hidpiThumb = disassembled.path.replace(find, replace)
+
+            find = filename + file_ext
+            replace = '_/' + filename + file_ext
+            thumb = disassembled.path.replace(find, replace)
+
+            img.set('srcset', hidpiThumb + ' 2x')
+            img.set('src', thumb)
+            img.set('data-src-original', url)
+
+            if (height > 0):
+                img.set('max-height', str(height) + 'px')
+
+            if (width > 0):
+                img.set('max-width', str(width) + 'px')
+
+            cache_key = '[images] ' + filepath
+            file_size = os.stat(filepath).st_size
+            previous_size = Cache.get(cache_key)
+
+            if (previous_size and previous_size != file_size) or not previous_size:
+                print 'Image compressing [' + filename + ']'
+                print 'Height [' + str(height) + 'px]'
+                print 'Width: [' + str(width) + 'px]'
+
+                self.convert(public_dir, url, height, width)
+                Cache.set(cache_key, file_size)
+
+        else:
+            img.set('src', url)
+
+        if (alt):
+            img.set('alt', alt)
+
+    def convert(self, public_dir, url, height=0, width=0):
+        script = '''\
+            public_dir=$0
+            url=$1
+            width=$2
+            height=$3
+
+            file=$public_dir$url
+            file_name=$(basename "$file")
+            ext="${file_name##*.}"
+            name="${file_name%.*}"
+            dir=$(dirname "${file}")/
+
+            THUMB_PATH=$dir"_"
+
+            [ -d $THUMB_PATH ] || mkdir $THUMB_PATH
+
+            if [ "$#" -eq 3 ] && ([ "$width" -gt 0 ] || [ "$height" -gt 0 ]); then
+                if [ "$width" -gt 0 ]; then
+                    W=`identify -format '%w' $file`
+                    double=$(($width * 2))
+                    convert "$file" -resize $double "$THUMB_PATH/${name}@2x.${ext}"
+                    convert "$file" -resize $width "$THUMB_PATH/${name}.${ext}"
+
+                else
+                    H=`identify -format '%h' $file`
+                    double=$(($height * 2))
+                    convert "$file" -resize x$double "$THUMB_PATH/${name}@2x.${ext}"
+                    convert "$file" -resize x$height "$THUMB_PATH/${name}.${ext}"
+                fi
+            else
+                W=`identify -format '%w' $file`
+
+                if [ "$W" -gt 1600 ]
+                then
+                    convert "$file" -resize 1600 "$THUMB_PATH/${name}@2x.${ext}"
+                    convert "$file" -resize 800 "$THUMB_PATH/${name}.${ext}"
+                else
+                    cp $file "$THUMB_PATH/${name}@2x.${ext}"
+                    convert "$THUMB_PATH/${name}@2x.${ext}" -resize 50% "$THUMB_PATH/${name}.${ext}"
+                fi
+            fi
+
+            if [ "$ext" == "png" ]; then
+                pngquant "$THUMB_PATH/${name}@2x.${ext}" --ext .${ext} --force
+                pngquant "$THUMB_PATH/${name}.${ext}" --ext .${ext} --force
+            else
+                pngquant "$THUMB_PATH/${name}@2x.${ext}" --ext='' --force
+                pngquant "$THUMB_PATH/${name}.${ext}" --ext='' --force
+            fi
+        '''
+
+        import subprocess
+
+        command = ['bash', '-c', script, public_dir, url, str(width), str(height)]
+        proc = subprocess.Popen(command)
+        proc.communicate()[0]
+
+    # ![By default](/i/ukrainian-keyboard-default.png){: width=400} assign width i.e. <img width="400"/>
+    def assignExtra(self, img, attr):
+        image_size = {'width': 0, 'height': 0}
+
+        BASE_RE = r'\{\:?([^\}]*)\}'
+        INLINE_RE = re.compile(r'^%s' % BASE_RE)
+        NAME_RE = re.compile(r'[^A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff'
+                             r'\u0370-\u037d\u037f-\u1fff\u200c-\u200d'
+                             r'\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff'
+                             r'\uf900-\ufdcf\ufdf0-\ufffd'
+                             r'\:\-\.0-9\u00b7\u0300-\u036f\u203f-\u2040]+')
+
+        m = INLINE_RE.match(attr)
+        if (m):
+            attr = m.group(1)
+
+            for k, v in attr_list.get_attrs(attr):
+                if k == '.':
+                    cls = img.get('class')
+                    if cls:
+                        img.set('class', '%s %s' % (cls, v))
+                    else:
+                        img.set('class', v)
+                else:
+                    key = NAME_RE.sub('_', k)
+                    img.set(key, v)
+
+                    if (k == 'width'):
+                        image_size['width'] = v
+
+                    if (k == 'height'):
+                        image_size['height'] = v
+
+        return image_size
+
+
+class FigureCaptionExtension(Extension):
+    def extendMarkdown(self, md, md_globals):
+        md.parser.blockprocessors.add('retina', ImagesProcessor(md.parser), '<ulist')
+
+
+def makeExtension(configs={}):
+    return FigureCaptionExtension(configs=configs)
 
 class Entry:
     def __init__(self, *initial_data, **kwargs):
@@ -127,6 +356,7 @@ class Post(Entry):
 class Page(Entry):
     pass
 
+posts_cache = 0
 
 class Press:
     def load_press(self):
@@ -446,12 +676,12 @@ class Octopress(Press):
             name=self.parse_name_from_file(name),
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
             meta_desc=meta_desc,
-            content=markdown(content, ['extra']),
-            description=markdown(description, ['extra']),
+            content=markdown(content, ['extra', FigureCaptionExtension()]),
+            description=markdown(description, ['extra', FigureCaptionExtension()]),
             categories=categories_list,
             link=link,
             sync=regenerate,
-            update_time=update_time
+            update_time=update_time,
         )
 
     def parse_name_from_file(self, name):
@@ -469,7 +699,7 @@ class Octopress(Press):
         return Page(
             name=name[:-9],
             title=re.search('(?<=title:).+', settings).group(0).strip()[1:-1],
-            content=markdown(body, ['extra'])
+            content=markdown(body, ['extra', FigureCaptionExtension()])
         )
 
 
@@ -514,8 +744,8 @@ class PostsEventHandler(FileSystemEventHandler):
 
                 print 'Post dispatched successfully.'
 
-            except Exception:
-                print 'Invalid post format.'
+            except Exception as e:
+                print 'Invalid post format or permissions not found'
 
     @staticmethod
     def update_time(filename):
@@ -553,14 +783,38 @@ def action_sync():
 
     if storage == 's3':
         bucket = config.get_option('sync', 'bucket')
+        build = config.build + "/"
+
         access_key_id = config.get_option('sync', 'access_key_id')
         secret_access_key = config.get_option('sync', 'secret_access_key')
 
-        system("/usr/local/bin/s3cmd sync -r --exclude=/logs --delete-removed --access_key=%s --secret_key=%s --acl-public --no-mime-magic --guess-mime-type %s s3://%s"
-               % (access_key_id, secret_access_key, config.build + "/", bucket))
+        s3cmd = "/usr/local/bin/s3cmd sync -r --access_key=%s --secret_key=%s --acl-public --no-mime-magic --guess-mime-type" % (access_key_id, secret_access_key)
+
+        system(s3cmd + " --rexclude='.css$|.js$|.jpg|.png|.gif|$' %s s3://%s" % (build, bucket))
+        system(s3cmd + " --rinclude='.css$|.js$|.jpg|.png|.gif|$' --add-header='Cache-Control:max-age=604800' --cf-invalidate %s s3://%s" % (build, bucket))
+    elif storage == 'git':
+        build = config.build + "/"
+        command = '/usr/bin/git -C ' + build
+        system(command + " add . ")
+        system(command + " commit -m %s" % ('"Micropress autogenerator update"'))
+
+        # push
+        try:
+            print 'git push started'
+            cmd = "find /tmp/com.apple.launchd.*/Listeners -type s | head -1"
+            ssh_auth_agent = os.popen(cmd).read().strip()
+            identity_key = path.expanduser(config.key)
+            args = ['/usr/bin/git', '-C', build, 'push']
+            env = dict(os.environ)
+            env['SSH_AUTH_SOCK'] = ssh_auth_agent
+            env['GIT_SSH_COMMAND'] = "ssh -i " + identity_key
+            p = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
+            p.communicate()
+        except Exception:
+            print 'Error running git push'
     else:
         try:
-            print 'RSync started.'
+            print 'rsync started'
             cmd = "find /tmp/com.apple.launchd.*/Listeners -type s | head -1"
             ssh_auth_agent = os.popen(cmd).read().strip()
             identity_key = path.expanduser(config.key)
@@ -572,7 +826,7 @@ def action_sync():
             p = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
             p.communicate()
         except Exception:
-            print 'Error running RSync.'
+            print 'Error running rsync'
 
     print('Sync done')
 
@@ -597,8 +851,8 @@ def action_generate():
     engine = Octopress()
     if not path.exists(config.build):
         system("mkdir -p " + config.build)
-    system("cp -r " + config.public + "/* " + config.build)
     engine.generate()
+    system("cp -r " + config.public + "/* " + config.build)
 
 
 def action_gp():
