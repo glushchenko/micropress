@@ -89,7 +89,7 @@ features.
 
 #### S3
 
-[sync]
+[sync]  
 type = s3  
 bucket = BUCKET_NAME  
 access_key_id = ACCESS_KEY_ID  
