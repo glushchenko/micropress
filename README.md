@@ -100,3 +100,9 @@ secret_access_key = SECRET_ACCESS_KEY
 [sync]  
 to = remote.host.name:/path/to/www # rsync path  
 key = ~/.ssh/id_rsa # ssh key for autosync feature  
+
+#### git
+
+[sync]  
+type = git  
+key = ~/.ssh/id_rsa # ssh key path, used for github commits
