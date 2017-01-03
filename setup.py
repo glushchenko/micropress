@@ -15,7 +15,7 @@ if StrictVersion('15.0.0') > StrictVersion(platform.release()):
 platform.release()
 setup(
     name='micropress',
-    version='0.2.20',
+    version='0.2.21',
     author='Oleksandr Glushchenko',
     author_email='contact@fluder.co',
     url='https://github.com/glushchenko/micropress',

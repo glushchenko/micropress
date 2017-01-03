@@ -796,7 +796,7 @@ def action_sync():
         build = config.build + "/"
         command = '/usr/bin/git -C ' + build
         system(command + " add . ")
-        system(command + " commit -m %s" % ('"Micropress autogenerator update"'))
+        system(command + " commit --amend -m %s" % ('"Micropress autogenerator update"'))
 
         # push
         try:
@@ -804,7 +804,7 @@ def action_sync():
             cmd = "find /tmp/com.apple.launchd.*/Listeners -type s | head -1"
             ssh_auth_agent = os.popen(cmd).read().strip()
             identity_key = path.expanduser(config.key)
-            args = ['/usr/bin/git', '-C', build, 'push']
+            args = ['/usr/bin/git', '-C', build, 'push', '--force-with-lease']
             env = dict(os.environ)
             env['SSH_AUTH_SOCK'] = ssh_auth_agent
             env['GIT_SSH_COMMAND'] = "ssh -i " + identity_key
