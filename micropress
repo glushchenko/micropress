@@ -86,7 +86,7 @@ class Cache:
                 return posts_cache[key]
             posts_cache.close()
         except Exception as e:
-            print e
+            return None
 
     @staticmethod
     def set(key, value):
@@ -94,6 +94,8 @@ class Cache:
         key = str(key)
         filename = config.cache + '/posts.db'
         try:
+            if not os.path.exists(config.cache):
+                os.makedirs(config.cache)
             posts_cache = shelve.open(filename, writeback=True)
             posts_cache[key] = value
             posts_cache.close()
@@ -134,6 +136,8 @@ class ImagesProcessor(BlockProcessor):
             attr = self.INLINE_LINK_RE.search(mdImage).group(3)
 
         public_dir = config.public
+        build_dir = config.build
+
         filepath = public_dir + url
 
         width = height = 0
@@ -182,7 +186,7 @@ class ImagesProcessor(BlockProcessor):
                 print 'Height [' + str(height) + 'px]'
                 print 'Width: [' + str(width) + 'px]'
 
-                self.convert(public_dir, url, height, width)
+                self.convert(public_dir, build_dir, url, height, width)
                 Cache.set(cache_key, file_size)
 
         else:
@@ -191,12 +195,13 @@ class ImagesProcessor(BlockProcessor):
         if (alt):
             img.set('alt', alt)
 
-    def convert(self, public_dir, url, height=0, width=0):
+    def convert(self, public_dir, build_dir, url, height=0, width=0):
         script = '''\
             public_dir=$0
-            url=$1
-            width=$2
-            height=$3
+            build_dir=$1
+            url=$2
+            width=$3
+            height=$4
 
             file=$public_dir$url
             file_name=$(basename "$file")
@@ -204,7 +209,9 @@ class ImagesProcessor(BlockProcessor):
             name="${file_name%.*}"
             dir=$(dirname "${file}")/
 
-            THUMB_PATH=$dir"_"
+            THUMB_PATH=$build_dir/i/"_"
+
+            cp $file $build_dir/i/
 
             [ -d $THUMB_PATH ] || mkdir $THUMB_PATH
 
@@ -245,7 +252,7 @@ class ImagesProcessor(BlockProcessor):
 
         import subprocess
 
-        command = ['bash', '-c', script, public_dir, url, str(width), str(height)]
+        command = ['bash', '-c', script, public_dir, build_dir, url, str(width), str(height)]
         proc = subprocess.Popen(command)
         proc.communicate()[0]
 
@@ -892,7 +899,10 @@ def action_init():
 
     if platform.system() == 'Darwin':
         launch_agents_src = path.join(src, 'launch_agents')
-        launch_agents_dst = '~/Library/LaunchAgents/'
+        launch_agents_dst = path.expanduser('~/Library/LaunchAgents/')
+
+        if not os.path.exists(launch_agents_dst):
+            os.makedirs(launch_agents_dst)
 
         watcher_name = 'co.fluder.micropress.watcher.plist'
         preview_name = 'co.fluder.micropress.preview.plist'
